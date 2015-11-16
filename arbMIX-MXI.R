@@ -4,7 +4,7 @@ library(data.table)
 
 #' 1min OHLC test
 symbs<-c("MXZ5 (12.2015)","MMZ5 (12.2015)")
-from<-as.Date("2015-09-16")
+from<-as.Date("2015-11-16")
 to<-Sys.Date()
 period="1min"
 for (symb in symbs)
