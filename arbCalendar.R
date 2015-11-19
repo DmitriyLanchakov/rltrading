@@ -26,16 +26,16 @@ plotSpread<-function(symbs,
     coefBeta<-as.numeric(symbs[3])
     spreadDT[,spread:=(i.Close/(Close*coefBeta)-1)*100*(!abs) + (i.Close-(Close*coefBeta))*(abs)]
     
-    qpi<-qplot(DateTimeSymb,
-               #format(DateTimeSymb, "%m%d"),
+    qpi<-qplot(#DateTimeSymb,
+               format(DateTimeSymb, "%m%d"),
                y=spread, 
                data=spreadDT, 
                alpha=0.05,
-               #geom = c("violin", "jitter"), 
-               geom=c("point", "smooth"),
+               geom = c("violin", "jitter"), 
+               #geom=c("point", "smooth"),
                xlab="Dates",
                ylab="",
-               main=paste(paste(symbs,collapse = "-"),
+               main=paste(paste(symbs[1:2],collapse = "-"),
                           paste(paste(names(summary(spreadDT$spread)),
                                       summary(spreadDT$spread), 
                                       sep="="),
@@ -57,7 +57,7 @@ symbs<-data.frame(c("SiZ5 (12.2015)","SiH6 (03.2016)",1),
                   c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-11-11",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2015-11-02",  abs=FALSE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
