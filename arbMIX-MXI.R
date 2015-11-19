@@ -10,6 +10,9 @@ period="1min"
 for (symb in symbs)
   getSymbols(symb, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 
+
+
+getStatSpread(symbs)
  
 leftLeg<-data.table(DateTimeSymb=as.POSIXct(index(get(symbs[1]))),
            as.data.frame(get(symbs[1]), stringsAsFactors=FALSE))
@@ -22,8 +25,13 @@ setkey(rightLeg,DateTimeSymb)
 
 leftLeg[rightLeg]
 
-qplot(format(DateTimeSymb, "%m%d"),y=Close-i.Close*100, data=leftLeg[rightLeg], color=Volume,
-       geom = c("violin", "jitter"))
+qplot(format(DateTimeSymb, "%m%d"),
+      y=Close-i.Close*100, 
+      data=leftLeg[rightLeg], 
+      color=Volume,
+      alpha=0.05,
+      geom = c("violin", "jitter"))
+
 qplot(DateTimeSymb,Close-i.Close*100,data=leftLeg[rightLeg],
       color=i.Volume)
 
