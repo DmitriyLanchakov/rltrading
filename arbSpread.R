@@ -27,22 +27,15 @@ getStatSpread<-function(symbols, rollperiod=0, smaPeriod=1, daysYear=365){
     
     symbDT<-data.table(as.POSIXct(index(symbDT)), symbDT)
 
-    setnames(symbDT,c("datetime","symbA", "symbB"))
-    symbDT<-symbDT[complete.cases(df),]
-    symbDT[,retA:=as.numeric(Delt(symbA,type="log"))]
-    symbDT[,retB:=as.numeric(Delt(symbB,type="log"))]
-    symbDT[,retBeta:=as.numeric(coef(lm(retA ~ retB+0))[1])]
-    symbDT[,retSpread := retA - retBeta*retB]
+    setnames(symbDT,c("datetime","leftLeg", "rightLeg"))
+    symbDT<-symbDT[complete.cases(symbDT),]
+    symbDT[,retLeft:=as.numeric(Delt(leftLeg,type="log"))]
+    symbDT[,retRight:=as.numeric(Delt(rightLeg,type="log"))]
+    symbDT[,retBeta:=as.numeric(coef(lm(retLeft ~ retRight+0))[1])]
     #priceModel<-lm(as.numeric(symbDT$symbA) ~ as.numeric(symbDT$symbB)+0)
-    betaCoef<-as.numeric(lm(as.numeric(symbDT$symbA) ~ as.numeric(symbDT$symbB)+0)[1])
-    betaCoef<-floor(betaCoef)
-    symbDT[,spread:=symbA - betaCoef*symbB]
-    
-#     rolllm<-rollapply(df,width =100,
-#               FUN= function (x)coef(lm(x[,1] ~ x[,2], data=as.data.frame(x))),
-#               by.column=FALSE, fill = NULL)
-    
-    #summary(symbDT)
+    symbDT[,spread:=leftLeg - retBeta*rightLeg]
+    symbDT[,retSpread := Delt(spread, type="log")]
+    return(symbDT)
 }
 
 
