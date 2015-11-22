@@ -72,7 +72,7 @@ getUserData<-function(userurl){
   
   #Sys.sleep(2)
   #Friends script
-  friendurl<-paste("http://smart-lab.ru/profile/ajaxfriendslist/?JsHttpRequest=0&login=",userlogin,sep="")
+  friendurl<-paste("http://smart-lab.ru/profile/ajaxfriendslist/?JsHttpRequest=99&login=",userlogin,sep="")
   if(url.exists(friendurl)){
     friendlist<-readLines(friendurl)
     friendlist<-gsub("\"","", friendlist)
@@ -85,7 +85,7 @@ getUserData<-function(userurl){
     friendlist<-NA
   #Sys.sleep(2)
   #Readers script
-  readerurl<-paste("http://smart-lab.ru/profile/ajaxreaderslist/?JsHttpRequest=0&login=",userlogin,sep="")
+  readerurl<-paste("http://smart-lab.ru/profile/ajaxreaderslist/?JsHttpRequest=99&login=",userlogin,sep="")
   
   if(url.exists(readerurl)){
     readerlist<-readLines(readerurl)
@@ -135,13 +135,37 @@ getUserData<-function(userurl){
   
     
 }
+
 smartDT<-data.table()
-for(usi in seq(150,nrow(peopleDT), 150)){
+
+for(usi in seq(29400,nrow(peopleDT), 25)){
   usiDT<-lapply(peopleDT$pageHref[seq(usi-149,usi)],getUserData)
   usiDT<-rbindlist(usiDT, fill=TRUE)
   smartDT<-rbind(smartDT, usiDT)
-  print(paste(usi-149, usi))
-  Sys.sleep(61*10)
+  print(paste(usi-24, usi))
+  Sys.sleep(61*2)
 }
   
-smartDT
+smartDT[,id:=.I]
+setkey(smartDT,id)
+smartDT[,userBirthDate:=as.POSIXct(rusDateConvert(userBirth,"%d %m %Y")),by=id]
+smartDT[,userRegDate:=as.POSIXct(rusDateConvert(userReg)),by=id]
+smartDT[,userLastVisitDate:=as.POSIXct(rusDateConvert(userLastVisit)),by=id]
+smartDT[,userAge:=year(Sys.Date())-year(userBirthDate), by=id]
+
+library(ggplot2)
+qplot(V1, data = smartDT[,mean(userAge), by=userlogin, mult="last"])
+summary(smartDT$userAge)
+
+
+setkey(smartDT, NULL)
+smartDT[userLastVisitDate>=as.POSIXct("2015-10-01"),mean(userAge),by=userlogin, mult="first"][,.N]
+
+
+smartDT[,userReg:=NULL]
+smartDT[,userBirth:=NULL]
+smartDT[,userLastVisit:=NULL]
+smartDT[readerlist=="eskalibur",userlogin,by=.(userlogin,readerlist), mult="first"]
+
+smartDT[userlogin=="r0man", friendlist, by=.(userlogin,friendlist), mult="first"]
+
