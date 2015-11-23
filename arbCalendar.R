@@ -8,7 +8,7 @@ plotSpread<-function(symbs,
                      from="2015-09-16",
                      to=Sys.Date(),
                      period="1min",
-                     abs=FALSE){
+                     abs=TRUE){
     for (symb in symbs[1:2])
         getSymbols(symb, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
     
@@ -63,7 +63,7 @@ symbs<-data.frame(c("SiZ4 (12.2014)","SiH5 (03.2015)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2014-09-14", to="2014-12-16",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2014-09-14", to="2014-12-16",  abs=TRUE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
@@ -85,7 +85,7 @@ symbs<-data.frame(c("SiH5 (03.2015)","SiM5 (06.2015)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2014-12-14", to="2015-03-16",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2014-12-14", to="2015-03-16",  abs=TRUE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
@@ -108,7 +108,7 @@ symbs<-data.frame(c("SiM5 (06.2015)","SiU5 (09.2015)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-03-14", to="2015-06-16",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2015-03-14", to="2015-06-16",  abs=TRUE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
@@ -130,7 +130,7 @@ symbs<-data.frame(c("SiU5 (09.2015)","SiZ5 (12.2015)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-03-14", to="2015-09-16",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2015-03-14", to="2015-09-16",  abs=TRUE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
@@ -153,7 +153,7 @@ symbs<-data.frame(c("SiZ5 (12.2015)","SiH6 (03.2016)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-09-14", to="2015-12-16",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2015-09-14", to="2015-12-16",  abs=TRUE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))
