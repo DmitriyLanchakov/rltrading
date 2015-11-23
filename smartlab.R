@@ -138,23 +138,31 @@ getUserData<-function(userurl){
 
 smartDT<-data.table()
 
-for(usi in seq(29400,nrow(peopleDT), 25)){
-  usiDT<-lapply(peopleDT$pageHref[seq(usi-149,usi)],getUserData)
+for(usi in seq(29400,nrow(peopleDT), 10)){
+  usiDT<-lapply(peopleDT$pageHref[seq(usi-9,usi)],getUserData)
   usiDT<-rbindlist(usiDT, fill=TRUE)
   smartDT<-rbind(smartDT, usiDT)
-  print(paste(usi-24, usi))
-  Sys.sleep(61*2)
+  print(paste(usi-9, usi))
+  Sys.sleep(61*1)
 }
-  
+
+load(file="alluser.RData")  
+smartDT<-unique(smartDT)
+
+save(smartDT,file="alluser.RData")  
+
 smartDT[,id:=.I]
+
 setkey(smartDT,id)
-smartDT[,userBirthDate:=as.POSIXct(rusDateConvert(userBirth,"%d %m %Y")),by=id]
-smartDT[,userRegDate:=as.POSIXct(rusDateConvert(userReg)),by=id]
-smartDT[,userLastVisitDate:=as.POSIXct(rusDateConvert(userLastVisit)),by=id]
-smartDT[,userAge:=year(Sys.Date())-year(userBirthDate), by=id]
+smartDT[,userBirthDate:=as.POSIXct(rusDateConvert(userBirth,"%d %m %Y")),by=1:nrow(smartDT)]
+smartDT[,userRegDate:=as.POSIXct(rusDateConvert(userReg)),by=1:nrow(smartDT)]
+smartDT[,userLastVisitDate:=as.POSIXct(rusDateConvert(userLastVisit)),by=1:nrow(smartDT)]
+smartDT[,userAge:=year(Sys.Date())-year(userBirthDate)]
+smartDT[,userSLAge:=year(userLastVisitDate)-year(userRegDate)]
 
 library(ggplot2)
-qplot(V1, data = smartDT[,mean(userAge), by=userlogin, mult="last"])
+qplot(V1, data = smartDT[,mean(userAge), by=userlogin, mult="last"][V1<100])
+qplot(V1, data = smartDT[,mean(userSLAge), by=userlogin, mult="last"][V1<7])
 summary(smartDT$userAge)
 
 
