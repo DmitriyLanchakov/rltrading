@@ -159,21 +159,57 @@ smartDT[,userRegDate:=as.POSIXct(rusDateConvert(userReg)),by=1:nrow(smartDT)]
 smartDT[,userLastVisitDate:=as.POSIXct(rusDateConvert(userLastVisit)),by=1:nrow(smartDT)]
 smartDT[,userAge:=year(Sys.Date())-year(userBirthDate)]
 smartDT[,userSLAge:=year(userLastVisitDate)-year(userRegDate)]
-
-library(ggplot2)
-qplot(V1, data = smartDT[,mean(userAge), by=userlogin, mult="last"][V1<100])
-qplot(V1, data = smartDT[,mean(userSLAge), by=userlogin, mult="last"][V1<7])
-summary(smartDT$userAge)
-
-
-setkey(smartDT, NULL)
-smartDT[userLastVisitDate>=as.POSIXct("2015-10-01"),mean(userAge),by=userlogin, mult="first"][,.N]
-
-
 smartDT[,userReg:=NULL]
 smartDT[,userBirth:=NULL]
 smartDT[,userLastVisit:=NULL]
-smartDT[readerlist=="eskalibur",userlogin,by=.(userlogin,readerlist), mult="first"]
 
-smartDT[userlogin=="r0man", friendlist, by=.(userlogin,friendlist), mult="first"]
+library(ggplot2)
+#User Age Hist
+
+smartDT[userAge<100 & userAge>10,userlogin, by=.(userlogin, userAge), mult="first"][,.N]
+qplot(userAge, data = smartDT[userAge<100 & userAge>10,userlogin, by=.(userlogin, userAge), mult="first"])+
+    scale_y_continuous(breaks=seq(0,1000,100))+
+    scale_x_continuous(breaks=seq(10,100,5))
+
+#User Sex Hist
+qplot(userSex, data = smartDT[,userlogin, by=.(userlogin,userSex), mult="first"],
+      fill=userSex)+
+    scale_y_continuous(breaks=seq(0,20000,500))
+    
+
+#User Location Hist
+smartDT[,userLocation, by=.(userlogin,userLocation), mult="first"][,.N, by=userLocation][order(-N)][N>10][1:20]
+
+#SL user lifetime Hist
+qplot(userSLAge, data = smartDT[userSLAge<6,mean(userSLAge), by=.(userlogin,userSLAge), mult="first"], binwidth=1)+
+    scale_y_continuous(breaks=seq(0,10000,500))
+
+
+#Last Visit Hist
+#Registration Hist
+qplot(userLastVisitDate,
+      data=smartDT[year(userLastVisitDate)>=2010,userlogin,
+                   by=.(userlogin,
+                        userLastVisitDate), mult="first"])+
+    scale_y_continuous(breaks=seq(0,6000,500))
+
+#Registration Hist
+qplot(userRegDate,
+      data=smartDT[year(userRegDate)>=2010 & userRegDate<as.POSIXct(Sys.Date()),userlogin,
+                   by=.(userlogin,
+                        userRegDate), mult="first"])+
+    scale_y_continuous(breaks=seq(0,2000,100))+
+    scale_x_datetime(breaks = date_breaks("3 month"))
+
+
+smartDT[readerlist=="Reshpekt",unique(userlogin),by=.(readerlist)]
+
+# Readers count rating
+smartDT[,unique(readerlist),by=.(userlogin)][,.N, by=userlogin][order(-N)][1:20]
+
+# User Reads count rating
+smartDT[,unique(userlogin),by=.(readerlist)][,.N, by=readerlist][order(-N)][1:20]
+
+# Friends count rating
+smartDT[,unique(friendlist),by=.(userlogin)][,.N, by=userlogin][order(-N)][1:20]
 
