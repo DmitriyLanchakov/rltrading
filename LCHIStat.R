@@ -1,5 +1,6 @@
 library(blotter)
 library(rusquant)
+library(data.table)
 
 EqPlot<-function(userId,marketId){
   #Portfolio and dAcconut names
@@ -12,7 +13,7 @@ EqPlot<-function(userId,marketId){
   
   
   #download user data and trades data
-  #userId<-"49083"
+  #userId<-"50175"
   yearId<-2015
   dateId<-"all" # all - all trades, 20141208 - day trades
   #marketId<-2 # 1 - spot, 2 - deriv
@@ -36,12 +37,21 @@ EqPlot<-function(userId,marketId){
   #Processing data and declare symbol
   #userSymbol<-"SiZ4"
   userSymbols<-levels(factor(userData$V2))
-  
   #Load historical data for the symbol
   #symbol<-"SiZ4 (12.2014)"
-  #tickers <- loadStockListMfd()
-  symbols<-unlist(sapply(paste(userSymbols, " ", sep=""), 
-                         searchSymbol, USE.NAMES=FALSE))
+  data("tickers")
+  
+  MOEXSymbols<-loadStockListMoex()
+  MOEXSymbols<-data.table(MOEXSymbols, stringsAsFactors=FALSE)
+  
+  
+  if (marketId==2) 
+    symbols<-unlist(sapply(paste(userSymbols, " ", sep=""), 
+                           searchSymbol, USE.NAMES=FALSE))
+  else 
+    symbols<-as.character(MOEXSymbols[shortSymbol %in% gsub(" ","",userSymbols)][,shortName])
+  
+  
   
   from<-as.Date(userData[1,1])
   to<-Sys.Date()
@@ -105,6 +115,16 @@ EqPlot<-function(userId,marketId){
   #Plots
   chart.Posn(userPortf, symbols[1], theme=theme)
 }
+
+
+
+EqPlot(50175,1)
+
+
+
+userData<-data.table(userData)
+userData[,Amount:=V3*V4]
+userData[,.(sum(V3), .N), by=V2]
 
 # chart.ME(
 #     Portfolio=userPortf,

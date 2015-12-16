@@ -83,6 +83,142 @@ df$pricenext<-timelag(df)
 #df$direction<-factor(sign(df$pricenext-df$price),levels=c(-1,0,1),labels=c("down", "flat","up"))
 #table(df$direction)
 
+############## WITH DATA TABLE #################################
+df<-data.table(df)
+
+df[,pricenext:=shift(price,10, type="lag")]
+
+df[,bidaskspread:=askprice0-bidprice0]
+df[,pricediff:=pricenext-price]
+df[,direction:=factor(sign(pricediff),levels=c(-1,0,1),labels=c("down", "flat","up"))]
+df[,voldelta:=askvolume0-bidvolume0]
+df[,logvoldelta:=log(askvolume0)-log(bidvolume0)]
+table(df$direction)
+
+qplot(pricediff,voldelta,color=direction,
+      data=df) 
+
+
+bidaskspreadTreshold<-80
+voldeltaTreshold<-50
+pricelag<-100
+
+
+qplot(voldelta,color=direction,fill=direction, stat="bin",binwidth = 1,
+      facets = bidaskspread~direction,
+      data=df[complete.cases(df),][bidaskspread<=bidaskspreadTreshold,])+
+  geom_vline(xintercept = voldeltaTreshold,alpha =I(0.7))+
+  geom_vline(xintercept = -voldeltaTreshold,alpha =I(0.7))+
+  ggtitle(paste(paste(min(df$datetime), max(df$datetime), sep=" :: "),
+                paste("VolDelta threshold",voldeltaTreshold, sep=" : "),sep="\n"))
+
+
+qplot(pricediff,color=direction,fill=direction, stat="bin",binwidth = 1,
+      facets = bidaskspread~direction,
+      data=df[complete.cases(df),])+
+  ggtitle(paste(paste(min(df$datetime), max(df$datetime), sep=" :: "),
+                paste("Price Lag",pricelag, sep=" : "),
+                paste("BidAskSpread threshold",bidaskspreadTreshold, sep=" : "),
+                sep="\n"))
+
+qplot(voldelta,color=direction,fill=direction, alpha=I(0.7), stat="bin",
+      facets = bidaskspread~direction,
+      binwidth = 10,
+      data=filter(df, bidaskspread<bidaskspreadTreshold, abs(voldelta)>voldeltaTreshold, abs(voldelta)<500))+
+  geom_vline(xintercept = voldeltaTreshold,alpha =I(0.7))+
+  geom_vline(xintercept = -voldeltaTreshold,alpha =I(0.7))+
+  ggtitle(paste(paste(min(df$datetime), max(df$datetime), sep=" :: "),
+                paste("VolDelta threshold",voldeltaTreshold, sep=" : "),
+                paste("BidAskSpread threshold",bidaskspreadTreshold, sep=" : "),
+                paste("Price Lag",pricelag, sep=" : "),
+                sep="\n"))
+
+qplot(pricediff,color=direction,fill=direction, alpha=I(0.7), stat="bin",
+      data=df[complete.cases(df),])+
+  ggtitle(paste(paste(min(df$datetime), max(df$datetime), sep=" :: "),
+                paste("VolDelta threshold",voldeltaTreshold, sep=" : "),
+                paste("BidAskSpread threshold",bidaskspreadTreshold, sep=" : "),
+                sep="\n"))
+
+#Accuracy Tests
+voldeltaMin<-0
+voldeltaMax<-500
+voldeltaStep<-500
+bidaskspreadMax<-70
+bidaskspreadMin<-10
+
+pricelagMin <- 10
+pricelagMax <- 1000
+pricelagStep<-10
+pred<-"up"
+
+
+checkAccuracy<-function(predValue, bidaskspreadMin,bidaskspreadMax,voldeltaLow,voldeltaUp){
+  dfVolDelta<-df[bidaskspread>=bidaskspreadMin]
+  if(nrow(dfVolDelta)==0){
+    return (0)
+  } 
+  
+  else{
+    dfVolDelta$pred<-predValue
+    dfVolDelta$pred<-factor(dfVolDelta$pred, levels=c("down","flat", "up"))
+    confusionMatrix(data=dfVolDelta$pred, dfVolDelta$direction)  
+    
+  }
+  
+}
+
+
+dfData<-df
+resDf<-data.table(PriceLag=NA,Prediction=NA,VolDeltaDown=NA, VolDeltaUp=NA, Accuracy=NA, Observations=NA)
+
+for(prl in seq(pricelagMin, pricelagMax, pricelagStep)){
+  
+  df[,pricenext:=shift(price,prl, type="lag")]
+  df[,pricediff:=pricenext-price]
+  df[,direction:=factor(sign(pricediff),levels=c(-1,0,1),labels=c("down", "flat","up"))]
+  df<-df[complete.cases(df),]
+  
+      pred="down"
+      resRow<-checkAccuracy(predValue="down",bidaskspreadMin, bidaskspreadMax, voldeltaLow, voldeltaMax)
+      if(is.list(resRow)){
+        resRow<-data.table(prl,pred,vdL, vdU, as.numeric(resRow$overall["Accuracy"]), sum(resRow$table))
+        resDf<-rbind(resDf, resRow, use.names=FALSE)
+        print(tail(resDf,1))
+      }
+      #print(resRow)
+      pred="up"
+      resRow<-checkAccuracy(predValue=pred,bidaskspreadMin, bidaskspreadMax, -voldeltaMax,-voldeltaLow)
+      if(is.list(resRow)){
+        resRow<-data.table(prl,pred,-vdL, -vdU, as.numeric(resRow$overall["Accuracy"]), sum(resRow$table))
+        resDf<-rbind(resDf, resRow, use.names=FALSE)
+        print(tail(resDf,1))
+      }
+
+}
+
+colnames(resDf)<-c("PriceLag","Prediction","VolDeltaDown", "VolDeltaUp", "Accuracy", "Observations")
+
+resDfClean<-resDf[complete.cases(resDf),]
+resDfClean<-mutate(resDfClean,
+                   PriceLag=as.numeric(PriceLag),
+                   Prediction=factor(Prediction, levels=c("down", "flat","up"), labels=c("down", "flat","up")),
+                   VolDeltaDown=as.numeric(VolDeltaDown),
+                   VolDeltaUp=as.numeric(VolDeltaUp),
+                   Accuracy=as.numeric(Accuracy),
+                   Observations=as.numeric(Observations))
+
+qplot(PriceLag, Accuracy, color = Prediction,
+      #facets=Prediction~.,
+      data= resDfClean, geom=c("point", "line"))
+
+
+
+
+
+###################################################
+
+
 df<-df %>%
     mutate(
         bidaskspread=askprice0-bidprice0,
@@ -112,7 +248,7 @@ qplot(pricediff,voldelta,color=direction,
       data=df)      
 
 #'TRESHOLDS:
-bidaskspreadTreshold<-10
+bidaskspreadTreshold<-80
 voldeltaTreshold<-50
 pricelag<-100
 df$pricenext<-lag(df$price, pricelag)
