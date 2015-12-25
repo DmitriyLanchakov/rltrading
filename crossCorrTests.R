@@ -5,14 +5,13 @@ options(digits.secs=3)
 #load("Si-12.152015-09-18.RData")
 #load("RTS-12.152015-09-18.RData")
 #load("SBRF-12.152015-09-18.RData")
-load("f:/TRADE/Data/research/SBRF/20151218SBER/SBER2015-12-18.RData")
-
+load("f:/TRADE/Data/research/SI/Si-3.16_FT2015-12-21.RData")
 symb1<-df
 rm(df)
 #load("RTS-12.152015-09-18.RData")
 #load("SBRF-12.152015-09-18.RData")
-load("f:/TRADE/Data/research/SBRF/20151218/SBRF-3.16_FT2015-12-18.RData")
 
+load("f:/TRADE/Data/research/USDTOM/USD000UTSTOM2015-12-21.RData")
 symb2<-df
 rm(df)
 
@@ -36,7 +35,7 @@ downlimit<-as.POSIXct(paste(dfdate,"10:05:00.000"))
 uplimit<-as.POSIXct(paste(dfdate,"18:00:00.000"))
 symbs<-symbs[datetime>downlimit & datetime<uplimit]
 
-ccf(symbs$symb1Ret,symbs$symb2Ret, lag.max=50)
+ccf(symbs$symb1Ret,symbs$symb2Ret, lag.max=100)
 
 ggplot(data=symbs)+
   geom_line(aes(datetime,i.askprice0/(bidprice0*100) -1), colour="mediumaquamarine", alpha=I(0.5))+

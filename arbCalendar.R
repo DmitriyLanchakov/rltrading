@@ -185,11 +185,12 @@ plotSpread<-function(symbs,
 # dev.off()
 rm(qp)
 
-symbs<-data.frame(#c("SiH6 (03.2016)","SiM6 (06.2016)",1),
-                  #c("RIH6 (03.2016)","RIM6 (06.2016)",1),
-                  #c("MXH6 (03.2016)","MXM6 (06.2016)",1),
-                  c("Сбербанк","SRZ5 (12.2015)",100),
-                  #c("GZH6 (03.2016)","GZM6 (06.2016)",1),
+symbs<-data.frame(c("SiH6 (03.2016)","SiM6 (06.2016)",1),
+                  c("RIH6 (03.2016)","RIM6 (06.2016)",1),
+                  c("MXH6 (03.2016)","MXM6 (06.2016)",1),
+                  c("Сбербанк","SRH6 (03.2016)",100),
+                  c("SRH6 (03.2016)","SRM6 (06.2016)",1),
+                  c("GZH6 (03.2016)","GZM6 (06.2016)",1),
                   #c("LKH6 (03.2016)","LKM6 (06.2016)",1),
                   #c("RNH6 (03.2016)","RNM6 (06.2016)",1),
                   #c("VBH6 (03.2016)","VBM6 (06.2016)",1),
@@ -198,7 +199,7 @@ symbs<-data.frame(#c("SiH6 (03.2016)","SiM6 (06.2016)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-09-16", to="2015-12-15",  abs=TRUE)
+qp<-lapply(symbs,plotSpread,from="2015-12-16", to="2015-12-22",  abs=FALSE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))

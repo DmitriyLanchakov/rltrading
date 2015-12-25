@@ -2,17 +2,24 @@
 
 library(ggplot2)
 library(data.table)
-library(dplyr)
 library(stringr)
-library(tidyr)
-library(NMOF)
-library(DEoptim)
+#library(tidyr)
+#library(NMOF)
+#library(DEoptim)
 library(fOptions)
 library(rusquant)
+######################################################################################
+# Market VOL research
+#
+#
+######################################################################################
+
 
 # MOEX Option Desk for current datetime
-symbol<-"Si-12.15"
-expDate<-"2015-12-15"
+symbol<-"Si-3.16"
+expDate<-"2016-01-21"
+period="1min"
+symb<-"SiH6 (03.2016)"
 link<-paste("http://moex.com/ru/derivatives/optionsdesk-csv.aspx?code=",
             symbol,
             "&sid=1&c1=on&c2=on&c3=on&c4=on&c5=on&c6=on&c7=on&marg=1&delivery=",
@@ -51,14 +58,133 @@ header<-c("CCODE",
           "PCODE")
 curOpDesk<-curOpDesk[,1:30]
 colnames(curOpDesk)<-header
-curOpDesk<-data.table(curOpDesk)
+curOpDesk<-data.table(curOpDesk, DateTime=as.POSIXct(Sys.time()))
 
-#Plot MOEX Volatility Smile
-qplot(x=Strike,y=IV, data=curOpDesk)
+curOpDesk<-rbind(curOpDesk[,.SD, .SDcols=c("CCODE",
+                                           "CTotalValue",
+                                           "CQtyLots",
+                                           "CQtyTrades",
+                                           "COI",
+                                           "CMaxDay",
+                                           "CMinDay",
+                                           "CLastTradePrice",
+                                           "CLastTradeDate",
+                                           "CLastTradeDiff",
+                                           "CBid",
+                                           "CAsk",
+                                           "CCalcPrice",
+                                           "CTheoPrice",
+                                           "Strike",
+                                           "IV",
+                                           "DateTime")][,TypeFlag:="CA"],
+                 curOpDesk[,.SD, .SDcols=c("PCODE",
+                                           "PTotalValue",
+                                           "PQtyLots",
+                                           "PQtyTrades",
+                                           "POI",
+                                           "PMaxDay",
+                                           "PMinDay",
+                                           "PLastTradePrice",
+                                           "PLastTradeDate",
+                                           "PLastTradeDiff",
+                                           "PBid",
+                                           "PAsk",
+                                           "PCalcPrice",
+                                           "PTheoPrice",
+                                           "Strike",
+                                           "IV",
+                                           "DateTime")][,TypeFlag:="PA"],
+                 use.names=FALSE,fill=FALSE)
 
+setnames(curOpDesk,c("CODE",
+                     "TotalValue",
+                     "QtyLots",
+                     "QtyTrades",
+                     "OI",
+                     "MaxDay",
+                     "MinDay",
+                     "LastTradePrice",
+                     "LastTradeDate",
+                     "LastTradeDiff",
+                     "Bid",
+                     "Ask",
+                     "CalcPrice",
+                     "TheoPrice",
+                     "Strike",
+                     "IV",
+                     "DateTime",
+                     "TypeFlag"
+))
 
+LastPriceSymb<-data.table(getSymbols(symb, from=curOpDesk$DateTime[1], period=period, src='mfd',adjust=TRUE, auto.assign=FALSE))[.N,]
+curOpDesk[,StockPriceMid:=LastPriceSymb[,(Open+High+Low+Close)/4]]
+curOpDesk[,c("PRICE", "tau"):=.((Bid+Ask)/2,
+                                as.numeric((as.POSIXct(expDate)-DateTime)/365))]
+curOpDesk[,id:=.I]
+curOpDesk<-curOpDesk[PRICE<TheoPrice*1.2 & PRICE>TheoPrice*0.8]
+curOpDesk[,GBSIVBidAsk:=GBSVolatility(price=PRICE, 
+                                TypeFlag = strtrim(tolower(TypeFlag),1), 
+                                S=StockPriceMid,
+                                X=Strike,
+                                Time=as.numeric(tau),
+                                r=0,
+                                b=0,
+                                maxiter=100), by=id]
+curOpDesk[,GBSIVCalc:=GBSVolatility(price=CalcPrice, 
+                                    TypeFlag = strtrim(tolower(TypeFlag),1), 
+                                    S=StockPriceMid,
+                                    X=Strike,
+                                    Time=as.numeric(tau),
+                                    r=0,
+                                    b=0,
+                                    maxiter=100), by=id]
+curOpDesk[,GBSIVTheo:=GBSVolatility(price=TheoPrice, 
+                                    TypeFlag = strtrim(tolower(TypeFlag),1), 
+                                    S=StockPriceMid,
+                                    X=Strike,
+                                    Time=as.numeric(tau),
+                                    r=0,
+                                    b=0,
+                                    maxiter=100), by=id]
+
+#Plot Hist GBS Volatility Smile
+nStrikes<-35
+StrikeStep<-250
+MaxStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep+nStrikes*StrikeStep
+MinStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep-nStrikes*StrikeStep
+
+ggplot()+
+    #geom_line(data=mydata[GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d %H")))+
+    geom_line(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+              aes(x=Strike,y=IV),colour="#4b0082")+
+    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+               aes(x=Strike,y=GBSIVBidAsk*100,shape=factor(TypeFlag), size=OI),colour="indianred")+
+    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+                aes(x=Strike,y=GBSIVBidAsk*100),colour="indianred")+
+    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+               aes(x=Strike,y=GBSIVCalc*100,shape=factor(TypeFlag),size=OI),colour="darkcyan")+
+    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+                aes(x=Strike,y=GBSIVCalc*100),colour="darkcyan")+
+    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+               aes(x=Strike,y=GBSIVTheo*100, shape=factor(TypeFlag),size=OI),colour="forestgreen")+
+    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+                aes(x=Strike,y=GBSIVTheo*100),colour="forestgreen")+
+    geom_vline(xintercept=LastPriceSymb$Close)+
+    scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
+    scale_y_continuous(breaks=seq(1,100,0.25))+
+    annotate("text", label = "Market IV", x = MinStrike*1.2, y = 10, size = 4, colour = "#4b0082")+
+    annotate("text", label = "Bid/Ask IV", x = MinStrike*1.2, y = 11, size = 4, colour = "indianred")+
+    annotate("text", label = "CalcPrice IV", x = MinStrike*1.2, y = 12, size = 4, colour = "darkcyan")+
+    annotate("text", label = "TheoPrice IV", x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+    
+
+######################################################################################
+# Stochastic VOL research
+#
+#
+######################################################################################
 #Load MOEX pption trades history
-histDates<-paste("201509", 29, sep="")
+histDates<-paste("201512", 23, sep="")
 getOptionHitory<-function(histDate){
   link<-paste("ftp://ftp.moex.com/pub/FORTS/pubstat/",
               histDate, "/",
@@ -102,7 +228,7 @@ mydata<-tradesOpdf[Expiration==expDate & Symbol==symbol,.SD,by=Strike]
 from<-as.Date(mydata[,min(DateTime)])
 to<-as.Date(mydata[,max(DateTime)])
 period="1min"
-symb<-"SiZ5 (12.2015)"
+symb<-"SiH6 (03.2016)"
 symbData<-getSymbols(symb, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=FALSE)
 symbData<-data.frame(DateTimeSymb=as.POSIXct(index(symbData)),as.data.frame(symbData, stringsAsFactors=FALSE),stringsAsFactors=FALSE)
 symbData=data.table(symbData)
@@ -111,20 +237,18 @@ mydata[,dtkey:=format(DateTime, "%Y%m%d%H%M")]
 setkey(symbData,dtkey)
 setkey(mydata, dtkey)
 mydata<-symbData[mydata]
+
 mydata[,c("PriceMid", "tau"):=.((Open+High+Low+Close)/4,as.numeric((Expiration-DateTime)/252))]
 mydata[,id:=.I]
 mydata[,GBSIV:=GBSVolatility(price=PRICE, 
-              TypeFlag = strtrim(tolower(OptType),1), 
-              S=PriceMid,
-              X=Strike,
-              Time=as.numeric(tau),
-              r=0,
-              b=0,
-              maxiter=100), by=id]
+                             TypeFlag = strtrim(tolower(OptType),1), 
+                             S=PriceMid,
+                             X=Strike,
+                             Time=as.numeric(tau),
+                             r=0,
+                             b=0,
+                             maxiter=100), by=id]
 
-
-#Plot Hist GBS Volatility Smile
-qplot(x=Strike,y=GBSIV*100, data=mydata, color=OptType)
 
 # BATES Model calibration
 optimfun<-function(p, data){
