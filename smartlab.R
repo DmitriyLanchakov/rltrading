@@ -27,24 +27,24 @@ load("sl.RData")
 #Russian Month convertion
 
 rusDateConvert<-function(rusdate, pattern="%d %m %Y, %H:%M"){
-  rusmonth<-c("января",
-              "февраля",
-              "марта",
-              "апреля",
-              "мая",
-              "июня",
-              "июля",
-              "августа",
-              "сентября",
-              "октября",
-              "ноября",
-              "декабря")
-  if(!length(rusdate)) rusdate="01 января 1900"
+    rusmonth<-c("января",
+                "февраля",
+                "марта",
+                "апреля",
+                "мая",
+                "июня",
+                "июля",
+                "августа",
+                "сентября",
+                "октября",
+                "ноября",
+                "декабря")
+    if(!length(rusdate)) rusdate="01 января 1900"
     strptime(gsub(strsplit(rusdate," ",fixed=TRUE)[[1]][2],
                   grep(strsplit(rusdate," ",fixed=TRUE)[[1]][2],rusmonth),rusdate),
              pattern)
-  
-  
+    
+    
 }
 
 ## User Data

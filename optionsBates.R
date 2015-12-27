@@ -5,7 +5,7 @@ library(data.table)
 library(stringr)
 #library(tidyr)
 #library(NMOF)
-#library(DEoptim)
+#library(DEoptim)штые
 library(fOptions)
 library(rusquant)
 ######################################################################################
