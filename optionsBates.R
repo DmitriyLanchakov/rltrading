@@ -3,9 +3,9 @@
 library(ggplot2)
 library(data.table)
 library(stringr)
-#library(tidyr)
-#library(NMOF)
-#library(DEoptim)штые
+library(tidyr)
+library(NMOF)
+library(DEoptim)
 library(fOptions)
 library(rusquant)
 ######################################################################################
@@ -161,10 +161,10 @@ ggplot()+
                aes(x=Strike,y=GBSIVBidAsk*100,shape=factor(TypeFlag), size=OI),colour="indianred")+
     geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
                 aes(x=Strike,y=GBSIVBidAsk*100),colour="indianred")+
-    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
-               aes(x=Strike,y=GBSIVCalc*100,shape=factor(TypeFlag),size=OI),colour="darkcyan")+
-    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
-                aes(x=Strike,y=GBSIVCalc*100),colour="darkcyan")+
+#    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+#               aes(x=Strike,y=GBSIVCalc*100,shape=factor(TypeFlag),size=OI),colour="darkcyan")+
+#    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+#                aes(x=Strike,y=GBSIVCalc*100),colour="darkcyan")+
     geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
                aes(x=Strike,y=GBSIVTheo*100, shape=factor(TypeFlag),size=OI),colour="forestgreen")+
     geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
@@ -180,11 +180,9 @@ ggplot()+
 
 ######################################################################################
 # Stochastic VOL research
-#
-#
 ######################################################################################
-#Load MOEX pption trades history
-histDates<-paste("201512", 23, sep="")
+#Load MOEX option trades history
+histDates<-paste("201512", 21:25, sep="")
 getOptionHitory<-function(histDate){
   link<-paste("ftp://ftp.moex.com/pub/FORTS/pubstat/",
               histDate, "/",
@@ -197,30 +195,20 @@ getOptionHitory<-function(histDate){
   df<-read.csv("opt_deal.csv",sep=";",stringsAsFactors = FALSE)
   file.remove("opt_deal.csv")
   file.remove(destFile)
-  
-  df<-df%>%
-    mutate(ISIN=gsub(" ", "", ISIN))%>%
-    mutate(Expiration=str_extract(ISIN,"[0-9]{6,6}"))%>%
-    separate(ISIN,c("Symbol","X"),sep="M[0-9]{6,6}", remove=FALSE)%>%
-    separate(X,c("X1","Strike"),sep="PA|CA", remove=FALSE)%>%
-    separate(X,c("OptType","X2"),sep="[0-9]", remove=FALSE, extra="drop")%>%
-    select(-X, -X1, -X2)
-  
-  df<-df%>% 
-    mutate(Symbol=as.factor(Symbol),
-           OptType=as.factor(OptType),
-           Strike=as.numeric(Strike),
-           Expiration=as.POSIXct(strptime(Expiration, "%d%m%y")),
-           DateTime=as.POSIXct(strptime(paste(DATE, TIME), "%d.%m.%Y %H:%M:%S")))%>%
-    select(-DATE, -TIME, -ISIN,-ID_DEAL, -TYPE)%>%
-    select(DateTime, Symbol, OptType, Strike, Expiration, PRICE, VOL)
+  df<-data.table(df)
+  df[,ISIN:=gsub(" ", "", ISIN)]
+  df[,Expiration:=as.POSIXct(strptime(str_extract(ISIN,"[0-9]{6,6}"),"%d%m%y"))]
+  df[,c("Symbol","X"):=tstrsplit(ISIN,"M[0-9]{6,6}")]
+  df[,Strike:=as.numeric(tstrsplit(X,"PA|CA")[[2]])]
+  df[,OptType:=tstrsplit(X,"[0-9]")[[1]]]
+  df[,DateTime:=as.POSIXct(strptime(paste(DATE, TIME), "%d.%m.%Y %H:%M:%S"))]
+ 
   print(link)
-  df
+  df[,.(DateTime, Symbol, OptType, Strike, Expiration, PRICE, VOL)]
 }
 
 tradesOpdf<-rbindlist(lapply(histDates, getOptionHitory))
-tradesOpdf<-data.table(tradesOpdf)
-tradesOpdf[,tau:=Expiration-DateTime]
+tradesOpdf[,tau:=as.numeric(difftime(Expiration,DateTime, "days"))/365]
 tradesOpdf[,id:=.I]
 
 
@@ -238,7 +226,7 @@ setkey(symbData,dtkey)
 setkey(mydata, dtkey)
 mydata<-symbData[mydata]
 
-mydata[,c("PriceMid", "tau"):=.((Open+High+Low+Close)/4,as.numeric((Expiration-DateTime)/252))]
+mydata[,PriceMid:=(Open+High+Low+Close)/4,]
 mydata[,id:=.I]
 mydata[,GBSIV:=GBSVolatility(price=PRICE, 
                              TypeFlag = strtrim(tolower(OptType),1), 
@@ -250,7 +238,19 @@ mydata[,GBSIV:=GBSVolatility(price=PRICE,
                              maxiter=100), by=id]
 
 
+ggplot()+
+    geom_point(data=mydata[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
+    geom_line(data=mydata[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
+    geom_vline(xintercept=LastPriceSymb$Close)+
+    scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
+    scale_y_continuous(breaks=seq(1,100,0.25))+
+    annotate("text", label = "HistPrice IV by hours", x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+
+
+
 # BATES Model calibration
+#' This is the R version of the error function and should be used for performance benchmarking and diagnostic purposes only
+
 optimfun<-function(p, data){
   r=0
   q=0
@@ -267,17 +267,46 @@ optimfun<-function(p, data){
             v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
             lambda = lambda, muJ = muJ, vJ = vJ, implVol = FALSE)-x[1])^2
   })
-  sum(res)
+  sqrt(sum(res))/(length(res))
 }
+
+mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA"]
 
 low = c(0.001,0.001,-1,0.001,0.001,0.001,0.001,0.001)
 high = c(1,1,1,1,1,1,1,1)
+eps <- 1e-8
+l<-c(eps, eps, -1.0+eps,eps,eps, eps,eps,eps)
+u<-c(5.0-eps, 1.0-eps,1.0-eps, 1.0-eps, 1.0-eps,1.-eps,1.0-eps,1.0-eps)
 
-#fit = DEoptim(optimfun, low, high, 
-#       data =mydata[OptType=="CA",.(PRICE, PriceMid, Strike, tau)] )
-#summary(fit)
+maxIt <- 20 
+population <- 100 # set the population size to 100
 
-p<-c(0.032934,    0.145827,    0.075226,    0.349588,    0.437278,    0.029334,    0.175097,    0.439060)
+fit = DEoptim(fn=optimfun, lower=l, upper=u, control=list(NP=population, itermax=maxIt),
+              data =mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA",
+                    .(PRICE, PriceMid, Strike, tau)] )
+as.numeric(fit$optim$bestmem)
+summary(fit)
+
+install.packages("nloptr")
+library(nloptr)
+p<-as.numeric(fit$optim$bestmem$optim$bestmem)
+eval_g_ineq <- function (x) {
+    grad <- c(-2.0*x[2],-2.0*x[1],2.0*x[3],0,0)
+    return(list("constraints"=c(x[3]*x[3] - 2.0*x[1]*x[2]), "jacobian"=grad))  
+}
+res<- nloptr( x0=p, 
+              eval_f=optimfun, 
+              eval_g_ineq=eval_g_ineq,
+              lb = l, 
+              ub = u, 
+              opts = list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-7),
+              data =mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA",
+                           .(PRICE, PriceMid, Strike, tau)])
+
+print(paste("Solution: ", res$solution))
+print(paste("RMSE: ", res$objective))
+
+p<-as.numeric(fit$optim$bestmem)
 r=0
 q=0
 v0=p[1]
@@ -291,17 +320,16 @@ vJ=p[8]
 
 lastSpotPrice<-last(symbData$Close)
 tau<-as.numeric(diff(c(last(symbData$DateTimeSymb),as.POSIXct("2015-12-15 18:45:00"))))/252
-bdf<-curOpDesk[,c("BatesCall","BatesIV"):=
-                                                        callCF(cf = cfBates, S = lastSpotPrice, X = Strike, tau = tau, r = r, q = q,
-                                                               v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
-                                                               lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=Strike]
+bdf<-curOpDesk[TypeFlag=="CA",c("BatesCall","BatesIV"):= callCF(cf = cfBates, S = lastSpotPrice, X = Strike, tau = tau, r = r, q = q,
+                                                  v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
+                                                  lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=Strike]
 
 
 smile<-ggplot()+
   geom_line(data=bdf,aes(x=Strike, y=IV),color="mediumaquamarine")+
   geom_point(data=bdf,aes(x=Strike, y=IV), colour="mediumaquamarine")+
   geom_line(data=bdf,aes(x=Strike, y=BatesIV*100),color="lightcoral")+
-  geom_point(data=bdf,aes(x=Strike, y=BatesIV*100), colour="lightcoral")+
-  geom_line(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")+
-  geom_point(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")
+  geom_point(data=bdf,aes(x=Strike, y=BatesIV*100), colour="lightcoral")
+#  geom_line(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")+
+#  geom_point(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")
 smile
