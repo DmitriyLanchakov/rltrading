@@ -115,7 +115,7 @@ setnames(curOpDesk,c("CODE",
                      "DateTime",
                      "TypeFlag"
 ))
-
+data("tickers")
 LastPriceSymb<-data.table(getSymbols(symb, from=curOpDesk$DateTime[1], period=period, src='mfd',adjust=TRUE, auto.assign=FALSE))[.N,]
 curOpDesk[,StockPriceMid:=LastPriceSymb[,(Open+High+Low+Close)/4]]
 curOpDesk[,c("PRICE", "tau"):=.((Bid+Ask)/2,
@@ -182,7 +182,7 @@ ggplot()+
 # Stochastic VOL research
 ######################################################################################
 #Load MOEX option trades history
-histDates<-paste("201512", 21:25, sep="")
+histDates<-paste("201512", 28:28, sep="")
 getOptionHitory<-function(histDate){
   link<-paste("ftp://ftp.moex.com/pub/FORTS/pubstat/",
               histDate, "/",
@@ -270,20 +270,20 @@ optimfun<-function(p, data){
   sqrt(sum(res))/(length(res))
 }
 
-mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA"]
+mydata[OptType=="CA",.N, by=format(DateTime,"%d%H")][order(N)]
 
-low = c(0.001,0.001,-1,0.001,0.001,0.001,0.001,0.001)
-high = c(1,1,1,1,1,1,1,1)
 eps <- 1e-8
 l<-c(eps, eps, -1.0+eps,eps,eps, eps,eps,eps)
 u<-c(5.0-eps, 1.0-eps,1.0-eps, 1.0-eps, 1.0-eps,1.-eps,1.0-eps,1.0-eps)
-
+startTime<- Sys.time()
 maxIt <- 20 
 population <- 100 # set the population size to 100
 
 fit = DEoptim(fn=optimfun, lower=l, upper=u, control=list(NP=population, itermax=maxIt),
-              data =mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA",
+              data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
                     .(PRICE, PriceMid, Strike, tau)] )
+Sys.time()-startTime
+
 as.numeric(fit$optim$bestmem)
 summary(fit)
 
