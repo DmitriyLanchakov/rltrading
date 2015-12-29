@@ -251,24 +251,66 @@ ggplot()+
 # BATES Model calibration
 #' This is the R version of the error function and should be used for performance benchmarking and diagnostic purposes only
 
+# optimfun<-function(p, data){
+#   
+#   res=apply(data, 1, FUN=function(x){
+#     (callCF(cf = cfBates, S = x[2], X = x[3], tau = x[4], 
+#             r=0,
+#             q=0,
+#             v0=p[1],
+#             vT=p[2],
+#             rho=p[3],
+#             k=p[4],
+#             sigma=p[5],
+#             lambda=p[6],
+#             muJ=p[7],
+#             vJ=p[8], implVol = FALSE)-x[1])^2
+#   })
+#   sqrt(sum(res))/(length(res))
+# }
+
 optimfun<-function(p, data){
-  r=0
-  q=0
-  v0=p[1]
-  vT=p[2]
-  rho=p[3]
-  k=p[4]
-  sigma=p[5]
-  lambda=p[6]
-  muJ=p[7]
-  vJ=p[8]
-  res=apply(data, 1, FUN=function(x){
-    (callCF(cf = cfBates, S = x[2], X = x[3], tau = x[4], r = r, q = q,
-            v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
-            lambda = lambda, muJ = muJ, vJ = vJ, implVol = FALSE)-x[1])^2
-  })
-  sqrt(sum(res))/(length(res))
+    data[, res:=
+        (callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, 
+                r=0,
+                q=0,
+                v0=p[1],
+                vT=p[2],
+                rho=p[3],
+                k=p[4],
+                sigma=p[5],
+                lambda=p[6],
+                muJ=p[7],
+                vJ=p[8], implVol = FALSE)-PRICE)^2,by=1:nrow(data)]
+    sqrt(sum(data$res))/nrow(data)
 }
+
+# optimfunloop<-function(p, data){
+#     res<-rep(0,nrow(data))
+#     for(i in 1:nrow(data))
+#     {
+#         res[i]<-(callCF(cf = cfBates, S = data[i,PriceMid], X = data[i,Strike], tau = data[i,tau], 
+#                         r=0,
+#                         q=0,
+#                         v0=p[1],
+#                         vT=p[2],
+#                         rho=p[3],
+#                         k=p[4],
+#                         sigma=p[5],
+#                         lambda=p[6],
+#                         muJ=p[7],
+#                         vJ=p[8], implVol = FALSE)-data[i,PRICE])^2
+#     }
+#     sqrt(sum(res))/(length(res))
+# }
+
+# library(microbenchmark)
+# microbenchmark(optimfunloop(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+#                                       .(PRICE, PriceMid, Strike, tau)]),
+#           optimfun(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+#                                    .(PRICE, PriceMid, Strike, tau)]),
+#           optimfunDT(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+#                                   .(PRICE, PriceMid, Strike, tau)]),times=5)
 
 mydata[OptType=="CA",.N, by=format(DateTime,"%d%H")][order(N)]
 
