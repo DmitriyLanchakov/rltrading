@@ -154,7 +154,7 @@ MaxStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep+nStrikes*StrikeStep
 MinStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep-nStrikes*StrikeStep
 
 ggplot()+
-    #geom_line(data=mydata[GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d %H")))+
+    #geom_line(data=histOptData[GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d %H")))+
     geom_line(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
               aes(x=Strike,y=IV),colour="#4b0082")+
     geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
@@ -212,23 +212,23 @@ tradesOpdf[,tau:=as.numeric(difftime(Expiration,DateTime, "days"))/365]
 tradesOpdf[,id:=.I]
 
 
-mydata<-tradesOpdf[Expiration==expDate & Symbol==symbol,.SD,by=Strike]
-from<-as.Date(mydata[,min(DateTime)])
-to<-as.Date(mydata[,max(DateTime)])
+histOptData<-tradesOpdf[Expiration==expDate & Symbol==symbol,.SD,by=Strike]
+from<-as.Date(histOptData[,min(DateTime)])
+to<-as.Date(histOptData[,max(DateTime)])
 period="1min"
 symb<-"SiH6 (03.2016)"
 symbData<-getSymbols(symb, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=FALSE)
 symbData<-data.frame(DateTimeSymb=as.POSIXct(index(symbData)),as.data.frame(symbData, stringsAsFactors=FALSE),stringsAsFactors=FALSE)
 symbData=data.table(symbData)
 symbData[,dtkey:=format(DateTimeSymb, "%Y%m%d%H%M")]
-mydata[,dtkey:=format(DateTime, "%Y%m%d%H%M")]
+histOptData[,dtkey:=format(DateTime, "%Y%m%d%H%M")]
 setkey(symbData,dtkey)
-setkey(mydata, dtkey)
-mydata<-symbData[mydata]
+setkey(histOptData, dtkey)
+histOptData<-symbData[histOptData]
 
-mydata[,PriceMid:=(Open+High+Low+Close)/4,]
-mydata[,id:=.I]
-mydata[,GBSIV:=GBSVolatility(price=PRICE, 
+histOptData[,PriceMid:=(Open+High+Low+Close)/4,]
+histOptData[,id:=.I]
+histOptData[,GBSIV:=GBSVolatility(price=PRICE, 
                              TypeFlag = strtrim(tolower(OptType),1), 
                              S=PriceMid,
                              X=Strike,
@@ -239,8 +239,8 @@ mydata[,GBSIV:=GBSVolatility(price=PRICE,
 
 
 ggplot()+
-    geom_point(data=mydata[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
-    geom_line(data=mydata[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
+    geom_point(data=histOptData[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
+    geom_line(data=histOptData[Strike>=MinStrike & Strike<=MaxStrike & GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d%H")))+
     geom_vline(xintercept=LastPriceSymb$Close)+
     scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
     scale_y_continuous(breaks=seq(1,100,0.25))+
@@ -285,6 +285,23 @@ optimfun<-function(p, data){
     sqrt(sum(data$res))/nrow(data)
 }
 
+# optimfunNL<-function(p){
+#     data<-histOptData[,.(PRICE, PriceMid, Strike, tau)]
+#     data[, res:=
+#              (callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, 
+#                      r=0,
+#                      q=0,
+#                      v0=p[1],
+#                      vT=p[2],
+#                      rho=p[3],
+#                      k=p[4],
+#                      sigma=p[5],
+#                      lambda=p[6],
+#                      muJ=p[7],
+#                      vJ=p[8], implVol = FALSE)-PRICE)^2,by=1:nrow(data)]
+#     sqrt(sum(data$res))/nrow(data)
+# }
+
 # optimfunloop<-function(p, data){
 #     res<-rep(0,nrow(data))
 #     for(i in 1:nrow(data))
@@ -305,50 +322,61 @@ optimfun<-function(p, data){
 # }
 
 # library(microbenchmark)
-# microbenchmark(optimfunloop(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+# microbenchmark(optimfunloop(u,data =histOptData[format(DateTime,timeInterval)==timeSlice&OptType=="CA",
 #                                       .(PRICE, PriceMid, Strike, tau)]),
-#           optimfun(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+#           optimfun(u,data =histOptData[format(DateTime,timeInterval)==timeSlice&OptType=="CA",
 #                                    .(PRICE, PriceMid, Strike, tau)]),
-#           optimfunDT(u,data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
+#           optimfunDT(u,data =histOptData[format(DateTime,timeInterval)==timeSlice&OptType=="CA",
 #                                   .(PRICE, PriceMid, Strike, tau)]),times=5)
 
-mydata[OptType=="CA",.N, by=format(DateTime,"%d%H")][order(N)]
+timeInterval<-"%d%H"
+timeSlice<-histOptData[OptType=="CA",.N, by=format(DateTime,timeInterval)][.N,format]
+histOptDataBackUp<-histOptData
 
+nStrikes<-35
+StrikeStep<-250
+
+histOptData<-histOptData[OptType=="CA" & format(DateTime,timeInterval)==timeSlice]
+
+MaxStrike<-floor(histOptData[.N,PriceMid]/StrikeStep)*StrikeStep+nStrikes*StrikeStep
+MinStrike<-floor(histOptData[.N,PriceMid]/StrikeStep)*StrikeStep-nStrikes*StrikeStep
+
+histOptData<-histOptData[Strike>=MinStrike & Strike<=MaxStrike]
+
+#Optimisation setup
 eps <- 1e-8
 l<-c(eps, eps, -1.0+eps,eps,eps, eps,eps,eps)
 u<-c(5.0-eps, 1.0-eps,1.0-eps, 1.0-eps, 1.0-eps,1.-eps,1.0-eps,1.0-eps)
 startTime<- Sys.time()
 maxIt <- 20 
-population <- 100 # set the population size to 100
+population <- 100
 
 fit = DEoptim(fn=optimfun, lower=l, upper=u, control=list(NP=population, itermax=maxIt),
-              data =mydata[format(DateTime,"%d%H")=="2814"&OptType=="CA",
-                    .(PRICE, PriceMid, Strike, tau)] )
+              data =histOptData[,.(PRICE, PriceMid, Strike, tau)] )
 Sys.time()-startTime
 
 as.numeric(fit$optim$bestmem)
 summary(fit)
 
-install.packages("nloptr")
+# #install.packages("nloptr")
 library(nloptr)
-p<-as.numeric(fit$optim$bestmem$optim$bestmem)
+p<-as.numeric(fit$optim$bestmem)
 eval_g_ineq <- function (x) {
     grad <- c(-2.0*x[2],-2.0*x[1],2.0*x[3],0,0)
     return(list("constraints"=c(x[3]*x[3] - 2.0*x[1]*x[2]), "jacobian"=grad))  
 }
 res<- nloptr( x0=p, 
-              eval_f=optimfun, 
-              eval_g_ineq=eval_g_ineq,
+              eval_f=optimfunNL, 
+              #eval_g_ineq=eval_g_ineq,
               lb = l, 
               ub = u, 
-              opts = list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-7),
-              data =mydata[format(DateTime,"%d%H")=="2412"&OptType=="CA",
-                           .(PRICE, PriceMid, Strike, tau)])
+              opts = list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-7))
 
 print(paste("Solution: ", res$solution))
 print(paste("RMSE: ", res$objective))
+res
+p<-res$solution
 
-p<-as.numeric(fit$optim$bestmem)
 r=0
 q=0
 v0=p[1]
@@ -360,18 +388,35 @@ lambda=p[6]
 muJ=p[7]
 vJ=p[8]
 
-lastSpotPrice<-last(symbData$Close)
-tau<-as.numeric(diff(c(last(symbData$DateTimeSymb),as.POSIXct("2015-12-15 18:45:00"))))/252
-bdf<-curOpDesk[TypeFlag=="CA",c("BatesCall","BatesIV"):= callCF(cf = cfBates, S = lastSpotPrice, X = Strike, tau = tau, r = r, q = q,
-                                                  v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
-                                                  lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=Strike]
+# lastSpotPrice<-last(symbData$Close)
+# tau<-as.numeric(diff(c(last(symbData$DateTimeSymb),as.POSIXct("2015-12-15 18:45:00"))))/252
+# bdf<-curOpDesk[TypeFlag=="CA",c("BatesCall","BatesIV"):= callCF(cf = cfBates, S = lastSpotPrice, X = Strike, tau = tau, r = r, q = q,
+#                                                   v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
+#                                                   lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=Strike]
 
+histOptData[,c("BatesCall","BatesIV"):= callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, r = r, q = q,
+                                                           v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
+                                                           lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=id]
 
-smile<-ggplot()+
-  geom_line(data=bdf,aes(x=Strike, y=IV),color="mediumaquamarine")+
-  geom_point(data=bdf,aes(x=Strike, y=IV), colour="mediumaquamarine")+
-  geom_line(data=bdf,aes(x=Strike, y=BatesIV*100),color="lightcoral")+
-  geom_point(data=bdf,aes(x=Strike, y=BatesIV*100), colour="lightcoral")
-#  geom_line(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")+
-#  geom_point(data=mydata,aes(x=Strike,y=GBSIV*100), colour="green")
-smile
+ggplot()+
+    geom_point(data=histOptData,aes(x=Strike,y=GBSIV*100),colour="mediumaquamarine")+
+    geom_line(data=histOptData,aes(x=Strike,y=GBSIV*100),colour="mediumaquamarine")+
+    geom_point(data=histOptData,aes(x=Strike,y=BatesIV*100),color="lightcoral")+
+    geom_line(data=histOptData,aes(x=Strike,y=BatesIV*100),color="lightcoral")+
+    geom_vline(xintercept=histOptData[.N,PriceMid])+
+    scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
+    scale_y_continuous(breaks=seq(1,100,0.25))+
+    annotate("text", label = "HistPrice IV", x = MinStrike*1.2, y = 13, size = 4, colour = "mediumaquamarine")+
+    annotate("text", label = "Bates IV", x = MinStrike*1.2, y = 12, size = 4, colour = "lightcoral")
+
+# 
+# 
+# 
+# smile<-ggplot()+
+#   geom_line(data=bdf,aes(x=Strike, y=IV),color="mediumaquamarine")+
+#   geom_point(data=bdf,aes(x=Strike, y=IV), colour="mediumaquamarine")+
+#   geom_line(data=bdf,aes(x=Strike, y=BatesIV*100),color="lightcoral")+
+#   geom_point(data=bdf,aes(x=Strike, y=BatesIV*100), colour="lightcoral")
+# #  geom_line(data=histOptData,aes(x=Strike,y=GBSIV*100), colour="green")+
+# #  geom_point(data=histOptData,aes(x=Strike,y=GBSIV*100), colour="green")
+# smile
