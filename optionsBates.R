@@ -182,7 +182,7 @@ ggplot()+
 # Stochastic VOL research
 ######################################################################################
 #Load MOEX option trades history
-histDates<-paste("201512", 28:28, sep="")
+histDates<-paste("201512", 29:29, sep="")
 getOptionHitory<-function(histDate){
   link<-paste("ftp://ftp.moex.com/pub/FORTS/pubstat/",
               histDate, "/",
@@ -285,22 +285,22 @@ optimfun<-function(p, data){
     sqrt(sum(data$res))/nrow(data)
 }
 
-# optimfunNL<-function(p){
-#     data<-histOptData[,.(PRICE, PriceMid, Strike, tau)]
-#     data[, res:=
-#              (callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, 
-#                      r=0,
-#                      q=0,
-#                      v0=p[1],
-#                      vT=p[2],
-#                      rho=p[3],
-#                      k=p[4],
-#                      sigma=p[5],
-#                      lambda=p[6],
-#                      muJ=p[7],
-#                      vJ=p[8], implVol = FALSE)-PRICE)^2,by=1:nrow(data)]
-#     sqrt(sum(data$res))/nrow(data)
-# }
+optimfunNL<-function(p){
+    data<-histOptData[,.(PRICE, PriceMid, Strike, tau)]
+    data[, res:=
+             (callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, 
+                     r=0,
+                     q=0,
+                     v0=p[1],
+                     vT=p[2],
+                     rho=p[3],
+                     k=p[4],
+                     sigma=p[5],
+                     lambda=p[6],
+                     muJ=p[7],
+                     vJ=p[8], implVol = FALSE)-PRICE)^2,by=1:nrow(data)]
+    sqrt(sum(data$res))/nrow(data)
+}
 
 # optimfunloop<-function(p, data){
 #     res<-rep(0,nrow(data))
@@ -329,14 +329,20 @@ optimfun<-function(p, data){
 #           optimfunDT(u,data =histOptData[format(DateTime,timeInterval)==timeSlice&OptType=="CA",
 #                                   .(PRICE, PriceMid, Strike, tau)]),times=5)
 
-timeInterval<-"%d%H"
-timeSlice<-histOptData[OptType=="CA",.N, by=format(DateTime,timeInterval)][.N,format]
+# Calculate Call prices only through put/call parity
+histOptData[OptType=="PA",PRICE:=putCallParity("call", put = PRICE,  S=PriceMid, X=Strike, tau=tau, r=0)]
+histOptData[OptType=="PA",OptType:="CA"]
+
+timeInterval<-"%d%H%M"
+timeSlice<-as.numeric(histOptData[OptType=="CA",.N, by=format(DateTime,timeInterval)][N>10][.N-1,format])
 histOptDataBackUp<-histOptData
 
-nStrikes<-35
+nStrikes<-20
 StrikeStep<-250
 
-histOptData<-histOptData[OptType=="CA" & format(DateTime,timeInterval)==timeSlice]
+histOptData<-histOptData[OptType=="CA" & 
+                             as.numeric(format(DateTime,timeInterval))>=timeSlice&
+                             as.numeric(format(DateTime,timeInterval))<=timeSlice+10]
 
 MaxStrike<-floor(histOptData[.N,PriceMid]/StrikeStep)*StrikeStep+nStrikes*StrikeStep
 MinStrike<-floor(histOptData[.N,PriceMid]/StrikeStep)*StrikeStep-nStrikes*StrikeStep
@@ -355,16 +361,16 @@ fit = DEoptim(fn=optimfun, lower=l, upper=u, control=list(NP=population, itermax
               data =histOptData[,.(PRICE, PriceMid, Strike, tau)] )
 Sys.time()-startTime
 
-as.numeric(fit$optim$bestmem)
-summary(fit)
+#as.numeric(fit$optim$bestmem)
+#summary(fit)
 
-# #install.packages("nloptr")
+# #inpstall.packages("nloptr")
 library(nloptr)
 p<-as.numeric(fit$optim$bestmem)
-eval_g_ineq <- function (x) {
-    grad <- c(-2.0*x[2],-2.0*x[1],2.0*x[3],0,0)
-    return(list("constraints"=c(x[3]*x[3] - 2.0*x[1]*x[2]), "jacobian"=grad))  
-}
+# eval_g_ineq <- function (x) {
+#     grad <- c(-2.0*x[2],-2.0*x[1],2.0*x[3],0,0)
+#     return(list("constraints"=c(x[3]*x[3] - 2.0*x[1]*x[2]), "jacobian"=grad))  
+# }
 res<- nloptr( x0=p, 
               eval_f=optimfunNL, 
               #eval_g_ineq=eval_g_ineq,
@@ -372,9 +378,9 @@ res<- nloptr( x0=p,
               ub = u, 
               opts = list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-7))
 
+print(paste("Total Calibration Time:",Sys.time()-startTime))
 print(paste("Solution: ", res$solution))
 print(paste("RMSE: ", res$objective))
-res
 p<-res$solution
 
 r=0
@@ -406,8 +412,8 @@ ggplot()+
     geom_vline(xintercept=histOptData[.N,PriceMid])+
     scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
     scale_y_continuous(breaks=seq(1,100,0.25))+
-    annotate("text", label = "HistPrice IV", x = MinStrike*1.2, y = 13, size = 4, colour = "mediumaquamarine")+
-    annotate("text", label = "Bates IV", x = MinStrike*1.2, y = 12, size = 4, colour = "lightcoral")
+    annotate("text", label = "HistPrice IV", x = MinStrike+StrikeStep*nStrikes, y = histOptData[,min(GBSIV)]*100, size = 4, colour = "mediumaquamarine")+
+    annotate("text", label = "Bates IV", x = MinStrike+StrikeStep*nStrikes, y = histOptData[,min(BatesIV)]*100, size = 4, colour = "lightcoral")
 
 # 
 # 
