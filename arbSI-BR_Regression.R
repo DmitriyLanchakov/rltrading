@@ -1,11 +1,11 @@
 library(rusquant)
 library(ggplot2)
 require(scales)
-symbols<-c("SiM5 (06.2015)",
-           "BRJ5 (04.2015)"
+symbols<-c("SiH6 (03.2016)",
+           "BRF6 (01.2016)"
            )
 
-from<-"2015-03-01"
+from<-"2015-12-01"
 to<-Sys.Date()
 period<-"1min"
 for(s in symbols)
