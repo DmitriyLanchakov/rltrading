@@ -163,21 +163,45 @@ plotSmile<-function(tSlice){
                            GBSIV<1 &
                            as.numeric(format(DateTime,timeInterval))==tSlice]
     ggplot()+
-        geom_point(data=chainDT,aes(x=Strike,y=GBSIV*100))+
-        geom_line(data=chainDT,aes(x=Strike,y=GBSIV*100))+
+        geom_point(data=chainDT,aes(x=Strike,y=GBSIV*100), colour="darkcyan")+
+        geom_line(data=chainDT,aes(x=Strike,y=GBSIV*100),colour="darkcyan")+
+        geom_point(data=chainDT,aes(x=Strike,y=BatesIV*100), colour="coral")+
+        geom_line(data=chainDT,aes(x=Strike,y=BatesIV*100),colour="coral")+
         geom_vline(xintercept=chainDT[.N]$PriceMid)+
         scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
         scale_y_continuous(breaks=seq(1,100,0.25))+
-        annotate("text", label = paste("HistPrice IV at", tSlice), x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+        annotate("text", label = paste("HistPrice IV at", tSlice), x = MinStrike*1.2, y = 13, size = 4, colour = "darkcyan")+
+        annotate("text", label = paste("BatesIV IV at", tSlice), x = MinStrike*1.2, y = 14, size = 4, colour = "coral")
+        
 }
 
 
-timeInterval<-"%d%H%M"
+timeInterval<-"%d%H"
 timeSlices<-BACHAINDT[OptType=="CA",.N, by=format(DateTime,timeInterval)]$format
 timeSlice<-as.numeric(BACHAINDT[OptType=="CA",.N, by=format(DateTime,timeInterval)][N>10][.N-1,format])
 
 BACHAINDTBackUp<-BACHAINDT
+
+chainDT<-BACHAINDT[Strike>=MinStrike & 
+                       Strike<=MaxStrike &
+                       as.numeric(format(DateTime,timeInterval))==2911]
+
+obpc<-findBatesModelParams(chainDT[,.(PRICE, PriceMid, Strike, tau)])
+
+r=0
+q=0
+v0=obpc[1]
+vT=obpc[2]
+rho=obpc[3]
+k=obpc[4]
+sigma=obpc[5]
+lambda=obpc[6]
+muJ=obpc[7]
+vJ=obpc[8]
+
+
+BACHAINDT[,c("BatesCall","BatesIV"):= callCF(cf = cfBates, S = PriceMid, X = Strike, tau = tau, r = r, q = q,
+                                               v0 = v0, vT = vT, rho = rho, k = k, sigma = sigma,
+                                               lambda = lambda, muJ = muJ, vJ = vJ, implVol = TRUE), by=id]
+
 manipulate(plotSmile(t),t=slider(1,length(timeSlices)))
-
-
-
