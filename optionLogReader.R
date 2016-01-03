@@ -53,7 +53,7 @@ library(DEoptim)
 library(fOptions)
 library(rusquant)
 options(digits.secs=3)
-fname<-"f:/TRADE/Data/research/option/29122015/"
+fname<-"29122015/"
 setwd(fname)
 
 fileList<-dir()
@@ -111,7 +111,7 @@ CHAINbidaskDT[,ExpMonthYear:=gsub("[A-z]{2,2}[0-9]{2,}B","",Symbol)]
 CHAINbidaskDT[,ExpMonth:=gsub("[0-9]","",ExpMonthYear)]
 CHAINbidaskDT[,ExpYear:=gsub("[A-z]","",ExpMonthYear)]
 CHAINbidaskDT[,Symbol:="Si-3.16_FT"]
-CHAINbidaskDT[,OptType:=ifelse(match(ExpMonth,LETTERS)>12,"PA", "CA")]
+CHAINbidaskDT[,OptType:=ifelse(match(ExpMonth,LETTERS)>12,"p", "c")]
 
 CHAINbidaskDT<-CHAINbidaskDT[,.(systemDateTime,Bid,BidSize,Ask,AskSize,Strike,OptType,Expiration)]
 CHAINbidaskDT<-CHAINbidaskDT[Bid>0&Ask>0]
@@ -136,7 +136,7 @@ BACHAINDT[,PRICE:=(OBid+OAsk)/2,]
 BACHAINDT[,tau:=as.numeric(difftime(Expiration,DateTime, "days"))/365]
 BACHAINDT[,id:=.I]
 BACHAINDT[,GBSIV:=GBSVolatility(price=PRICE, 
-                                  TypeFlag = strtrim(tolower(OptType),1), 
+                                  TypeFlag = OptType, 
                                   S=PriceMid,
                                   X=Strike,
                                   Time=tau,
@@ -155,6 +155,29 @@ ggplot()+
     scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
     scale_y_continuous(breaks=seq(1,100,0.25))+
     annotate("text", label = "HistPrice IV by hours", x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+
+plotSmile<-function(tSlice){
+    tSlice<-timeSlices[tSlice]
+    chainDT<-BACHAINDT[Strike>=MinStrike & 
+                           Strike<=MaxStrike & 
+                           GBSIV<1 &
+                           as.numeric(format(DateTime,timeInterval))==tSlice]
+    ggplot()+
+        geom_point(data=chainDT,aes(x=Strike,y=GBSIV*100))+
+        geom_line(data=chainDT,aes(x=Strike,y=GBSIV*100))+
+        geom_vline(xintercept=chainDT[.N]$PriceMid)+
+        scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
+        scale_y_continuous(breaks=seq(1,100,0.25))+
+        annotate("text", label = paste("HistPrice IV at", tSlice), x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+}
+
+
+timeInterval<-"%d%H%M"
+timeSlices<-BACHAINDT[OptType=="CA",.N, by=format(DateTime,timeInterval)]$format
+timeSlice<-as.numeric(BACHAINDT[OptType=="CA",.N, by=format(DateTime,timeInterval)][N>10][.N-1,format])
+
+BACHAINDTBackUp<-BACHAINDT
+manipulate(plotSmile(t),t=slider(1,length(timeSlices)))
 
 
 
