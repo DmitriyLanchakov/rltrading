@@ -52,6 +52,7 @@ library(NMOF)
 library(DEoptim)
 library(fOptions)
 library(rusquant)
+library(manipulate)
 options(digits.secs=3)
 fname<-"29122015/"
 setwd(fname)
@@ -184,7 +185,8 @@ BACHAINDTBackUp<-BACHAINDT
 
 chainDT<-BACHAINDT[Strike>=MinStrike & 
                        Strike<=MaxStrike &
-                       as.numeric(format(DateTime,timeInterval))==2911]
+                       as.numeric(format(DateTime,timeInterval))>=2911&
+                       as.numeric(format(DateTime,timeInterval))<=2918]
 
 obpc<-findBatesModelParams(chainDT[,.(PRICE, PriceMid, Strike, tau)])
 

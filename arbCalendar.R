@@ -199,7 +199,7 @@ symbs<-data.frame(c("SiH6 (03.2016)","SiM6 (06.2016)",1),
                   #c("MMZ5 (12.2015)","MXZ5 (12.2015)",100),
                   stringsAsFactors = FALSE)
 
-qp<-lapply(symbs,plotSpread,from="2015-12-16", to="2015-12-22",  abs=FALSE)
+qp<-lapply(symbs,plotSpread,from="2016-01-01", to="2016-01-24",  abs=FALSE)
 pushViewport(viewport(layout = grid.layout(length(qp), 1)))
 for(i in 1:length(qp))
     print(qp[[i]], vp = viewport(layout.pos.row = i, layout.pos.col = 1))

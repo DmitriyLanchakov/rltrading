@@ -1,0 +1,55 @@
+# Готовим классификаторы
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+from datetime import date
+import numpy as np
+import matplotlib.pyplot as plt
+import xgboost as xgb
+from matplotlib.widgets import Cursor
+
+names = ["Nearest Neighbors", "RBF SVM", "RandomForest", "AdaBoost", "XGBoost"]    # пробелы недопустимы
+classifiers = [
+    KNeighborsClassifier(3),
+    SVC(gamma=2, C=1),
+    RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
+    AdaBoostClassifier(),
+    xgb.XGBClassifier(silent=False, nthread=4, max_depth=8, n_estimators=340, subsample=0.5, learning_rate=0.006)
+]
+
+R = pd.read_hdf('R:\\R.hdf')
+Eq = pd.DataFrame(columns=['DT'])       # Структура с результатами всех методов классификации (колонки добавляются)
+
+for year in range(2007, 2016):
+    # Тренировочный набор - предыдущий год
+    R_train = R[(R.DT > date(year-1, 1, 1)) & (R.DT < date(year, 1, 1))].reset_index()
+    X_train = StandardScaler().fit_transform(np.c_[R_train.Gap, R_train.Timeout])
+    Y_train = np.sign(R_train.Profit)
+    np.savetxt('R:\\' + str(year) + '.train.csv', np.c_[X_train, Y_train], fmt='%1.4f', delimiter=';', newline='\r\n')
+
+    # Тестовый набор - текущий год
+    R_test = R[(R.DT > date(year, 1, 1)) & (R.DT < date(year + 1, 1, 1))].reset_index()
+    X_test = StandardScaler().fit_transform(np.c_[R_test.Gap, R_test.Timeout])
+    Y_test = np.sign(R_test.Profit)
+    np.savetxt('R:\\' + str(year) + '.test.csv', np.c_[X_test, Y_test], fmt='%1.4f', delimiter=';', newline='\r\n')
+
+    # Перебираем все подключенные классификаторы
+    E = pd.DataFrame({'DT': R_test.DT})
+    for name, clf in zip(names, classifiers):
+        clf.fit(X_train, Y_train)
+        score = clf.score(X_test, Y_test)
+        Y_test = clf.predict(X_test)
+        E[name] = R_test.Profit * Y_test
+
+    # Добавляем результаты в склееную таблицу
+    Eq = Eq.append(E)
+
+# Отображаем все результаты
+fig = plt.figure(figsize=(28,18))
+for name in names:
+    plt.plot(Eq.DT, Eq[name].cumsum()/30, label=name)
+
+plt.plot(R.DT, R.Profit.cumsum()/30, label='average')
+legend = plt.legend(loc='upper center', shadow=True)
