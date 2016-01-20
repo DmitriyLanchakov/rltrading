@@ -9,14 +9,17 @@ dt<-fread("R.csv", stringsAsFactors = FALSE)
 
 dt[,DT:=as.POSIXct(DT)]
 dt[,direction:=factor(sign(Profit),levels=c(-1,0,1),labels=c("down","flat", "up"))]
-features<-c("direction","Gap", "Timeout")
-
+dt[,weekday:=weekdays(DT)]
+dt[,monthday:=format(DT,"%d")]
+dt[,month:=format(DT,"%m")]
+features<-c("direction","Gap","weekday","monthday","month", "Timeout")
+dt<-dt[weekday!="Sunday" & weekday!="Saturday"]
 
 processModFit<-function(yr){
     
     training<-dt[format(DT,"%Y")==yr-1, .SD, .SDcols=features]
     testing<-dt[format(DT,"%Y")==yr, .SD, .SDcols=features]
-    testProfit<-dt[format(DT,"%Y")==year(dt[, max(DT)])]
+    testProfit<-dt[format(DT,"%Y")==yr]
     
     print(paste("Training:",yr-1, "/ Testing:", yr))
     
@@ -24,7 +27,7 @@ processModFit<-function(yr){
     preproc <- preProcess(dt[,.SD, .SDcols=features[-1]])#, method='pca', thresh=0.99)
     training.sc <- predict(preproc, training[,-1, with=FALSE])
     testing.sc <- predict(preproc, testing[,-1, with=FALSE])
-    dim(training.sc); dim(testing.sc)
+#    dim(training.sc); dim(testing.sc)
     
     
 #     #' k-Nearest Neighbors
@@ -68,11 +71,16 @@ processModFit<-function(yr){
 #     gc()
     
     #' eXtreme Gradient Boosting
+    print("**Start eXtreme Gradient Boosting**")
+    print(Sys.time())
+
     modFit<-train(training[,direction] ~ .,method="xgbLinear",data=training.sc)
     modPred<-predict(modFit,newdata=testing.sc)
     testProfit[,modxgbLinear:=(as.numeric(modPred)-2)*Profit]
-    print("**eXtreme Gradient Boosting**")
     print(confusionMatrix(data=modPred, testing[,direction]))
+
+    print(Sys.time())
+    print("**End eXtreme Gradient Boosting**")
     gc()
     
     testProfit
@@ -81,11 +89,11 @@ processModFit<-function(yr){
 
 tP<-rbindlist(lapply(2007:2015, FUN=processModFit))
 pfvars<-c("Profit",
-          "modKNN",
-          "modsvmRadial",
-          "modRpart",
-          "modRF",
-          "modGBM",
+          #"modKNN",
+          #"modsvmRadial",
+          #"modRpart",
+          #"modRF",
+          #"modGBM",
           "modxgbLinear")
 tP<-melt(tP,measure.vars = pfvars)
 
