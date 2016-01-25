@@ -97,6 +97,17 @@ pfvars<-c("Profit",
           "modxgbLinear")
 tP<-melt(tP,measure.vars = pfvars)
 
-dtEq=tP[,.(cumsum(value),DT),by=.(variable,Timeout)]
-qplot(y=V1,x=DT,data=dtEq,color=factor(Timeout),geom="line",facets = variable~.)
+dtEq=tP[,.(cumsum(value)/30,DT),by=.(variable)]
+qplot(y=V1,x=DT,data=dtEq,color=factor(variable),geom="line")
 
+dtEq=tP[,.(sum(value)),by=.(variable,Timeout)]
+qplot(weight=V1,x=Timeout,data=dtEq,fill=factor(Timeout),
+      binwidth=1,
+      geom="bar",
+      facets = variable~.)
+
+dtEq=tP[,.(sum(value)),by=.(variable,weekday)]
+qplot(weight=V1,x=weekday,data=dtEq,fill=weekday,
+      binwidth=1,
+      geom="bar",
+      facets = variable~.)
