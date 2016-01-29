@@ -89,7 +89,8 @@ ts_argmin<-function(x, d){
     
 #' time-series rank in the past d days
 ts_rank<-function(x, d){
-    ranks(last(x, d))
+    rollapply(x,d,FUN=function(xs) last(rank(xs)))
+    
 }
 
 #' time-series sum over the past d days

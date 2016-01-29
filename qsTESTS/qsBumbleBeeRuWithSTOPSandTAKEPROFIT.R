@@ -3,18 +3,25 @@ library(quantstrat)
 # Bumblebee trading system
 # copyright (c) 2009-2013, Algorithm Alpha, LLC
 # RUSSIAN MARKET INTRADAY
-# WITH STOP LOSS
-
+### WITH STOP LOSS
+Sys.setenv(TZ="UTC")
 timerS<-Sys.time()
 ############################# GET DATA ######################################
-from<-as.Date("2015-05-01")
-to<-as.Date("2015-05-29") #Sys.Date()
+from<-as.Date("2015-12-16")
+to<-Sys.Date()
 period="1min"
-symbols<-c("SiM5 (06.2015)",
-            "SRM5 (06.2015)",
-            "GZM5 (06.2015)",
-            "RIM5 (06.2015)")
+symbols<-c("SiH6 (03.2016)",
+           #"SRH6 (03.2016)",
+           #"GZH6 (03.2016)",
+           "RIH6 (03.2016)")
 
+# from<-as.Date("2015-09-16")
+# to<-as.Date("2015-12-15")#Sys.Date()
+# period="1min"
+# symbols<-c("SiZ5 (12.2015)",
+#            #"SRZ5 (12.2015)",
+#            #"GZZ5 (12.2015)",
+#            "RIZ5 (12.2015)")
 # 
 #For stock names in Russian
 #Sys.setlocale(category = "LC_ALL", locale = "Russian")
@@ -23,8 +30,8 @@ symbols<-c("SiM5 (06.2015)",
 if (!exists('.blotter')) .blotter <- new.env()
 if (!exists('.strategy')) .strategy <- new.env()
 #if(!exists(toupper(symbols[1])))
-    for(s in symbols)
-        getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
+for(s in symbols)
+    getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 symbols<-toupper(symbols)
 
 #Time frame filer to reduce market opening and closing gap
@@ -33,22 +40,21 @@ symbols<-toupper(symbols)
 
 symbol<-symbols[1]
 ############################# DEFINE VARIABLES ##############################
-Sys.setenv(TZ="UTC")
 port          = 'bumblebeePort'
 acct          = 'bumblebeeAcct'
 strat         = "bumblebee"
 initEq        = 100000
-initDate      = '1969-12-31'
-fast          = 9
-slow          = 20
+initDate      = from
+fast          = 15
+slow          = 45
 sd            = 0.1
-EndOFDatTime  ="18:15"
+EndOFDatTime  ="18:40"
 intraDay      = TRUE
 StopLossFlag  = TRUE
-stopLossPercent= 0.25/100
-StopTrailingFlag = FALSE
+stopLossPercent= 0.20/100
+StopTrailingFlag = TRUE
 takeProfitPercent = 0.5/100
-takeProfitFlag=TRUE
+takeProfitFlag=FALSE
 brokerFee = -2
 
 
@@ -82,7 +88,7 @@ for(s in symbols)
         symbol=s, 
         timestamp=initDate,  
         maxpos=1,
-        minpos=0)
+        minpos=-1)
 
 
 ############################# INDICATORS ####################################
@@ -91,12 +97,12 @@ for(s in symbols)
 add.indicator(strat, 
               name='BBands', label='bb',
               arguments = list(HLC=quote(HLC(mktdata)), n=slow, sd=sd, maType='SMA'),
-              storefun=TRUE)
+              storefun=FALSE)
 
 # SMA is is like bumblebee wings
 add.indicator(strat, name='SMA', label='fast', 
               arguments = list(x=quote(Cl(mktdata)), n=fast),
-              storefun=TRUE)
+              storefun=FALSE)
 
 
 ############################# SIGNALS #######################################
@@ -104,35 +110,35 @@ add.signal(strat,
            name='sigCrossover', 
            label= 'fld', 
            arguments = list(columns=c('SMA','dn'), relationship='lt'),
-           storefun=TRUE)
+           storefun=FALSE)
 
 #NEW
 add.signal(strat, 
            name='sigCrossover', 
            label= 'flu', 
            arguments = list(columns=c('SMA','up'), relationship='lt'),
-           storefun=TRUE)
+           storefun=FALSE)
 
 add.signal(strat, 
            name='sigCrossover', 
            label='fgu', 
            arguments = list(columns=c('SMA','up'), relationship='gt'),
-           storefun=TRUE)
+           storefun=FALSE)
 
 #NEW
 add.signal(strat, 
            name='sigCrossover', 
            label='fgd', 
            arguments = list(columns=c('SMA','dn'), relationship='gt'),
-           storefun=TRUE)
+           storefun=FALSE)
 
 
 add.signal(strat,
            name='sigTimestamp',
            label='endday',
            arguments=list(timestamp=EndOFDatTime),
-           storefun=TRUE)
-           
+           storefun=FALSE)
+
 ############################# RULES #########################################
 
 # Just imagine fat bumblebee. It's trying to fly.
@@ -153,7 +159,8 @@ add.rule(strategy  =strat,
                         orderside='long',
                         TxnFees=brokerFee,
                         orderset='ocolong',
-                        osFUN= 'osMaxPos'))
+                        osFUN= 'osMaxPos'),
+         storefun=FALSE)
 
 
 
@@ -170,61 +177,65 @@ add.rule(strategy  =strat,
                         ordertype='market',
                         TxnFees=brokerFee,
                         orderset='ocolong',
-                        orderside='long'))
+                        orderside='long'),
+         storefun=FALSE)
 
 # Take Profit
-add.rule(strategy  =strat, 
-         name = 'ruleSignal',
-         arguments=list(sigcol='fgu' , 
-                        sigval=TRUE,
-                        replace=FALSE,
-                        orderside='long',
-                        TxnFees=brokerFee,
-                        ordertype='limit', 
-                        tmult=TRUE, 
-                        threshold=quote(takeProfitPercent),
-                        orderqty='all',
-                        orderset='ocolong'),
-         type='chain', 
-         parent='EnterLONG',
-         label='TakeProfitLONG',
-         enabled=takeProfitFlag)
-
-# Stop Loss Rule
-add.rule(strategy =strat,
-         name="ruleSignal",
-         type="chain", parent="EnterLONG",
-         label="StopLossLONG",
-         path.dep=TRUE,
-         arguments = list(sigcol="fgu", 
-                          sigval=TRUE,
-                          replace=FALSE,
-                          orderqty="all",
-                          orderside="long",
-                          TxnFees=brokerFee,
-                          ordertype="stoplimit",
-                          orderset='ocolong',
-                          tmult=TRUE,
-                          threshold=quote(stopLossPercent)),
-         enabled=StopLossFlag)
-
-# StopTrailing Rule
-add.rule(strategy  =strat,
-         name="ruleSignal",
-         type="chain", parent="EnterLONG",
-         label="StopTrailingLONG",
-         path.dep=TRUE,
-         arguments = list(sigcol="fgu", 
-                          sigval=TRUE,
-                          replace=FALSE,
-                          orderqty="all",
-                          orderside="long",
-                          TxnFees=brokerFee,
-                          ordertype="stoptrailing",
-                          orderset='ocolong',
-                          tmult=TRUE,
-                          threshold=quote(stopLossPercent)),
-         enabled=StopTrailingFlag)
+# add.rule(strategy  =strat, 
+#          name = 'ruleSignal',
+#          arguments=list(sigcol='fgu' , 
+#                         sigval=TRUE,
+#                         replace=FALSE,
+#                         orderside='long',
+#                         TxnFees=brokerFee,
+#                         ordertype='limit', 
+#                         tmult=TRUE, 
+#                         threshold=quote(takeProfitPercent),
+#                         orderqty='all',
+#                         orderset='ocolong'),
+#          type='chain', 
+#          parent='EnterLONG',
+#          label='TakeProfitLONG',
+#          enabled=takeProfitFlag,
+#          storefun=FALSE)
+# 
+# # Stop Loss Rule
+# add.rule(strategy =strat,
+#          name="ruleSignal",
+#          type="chain", parent="EnterLONG",
+#          label="StopLossLONG",
+#          path.dep=TRUE,
+#          arguments = list(sigcol="fgu", 
+#                           sigval=TRUE,
+#                           replace=FALSE,
+#                           orderqty="all",
+#                           orderside="long",
+#                           TxnFees=brokerFee,
+#                           ordertype="stoplimit",
+#                           orderset='ocolong',
+#                           tmult=TRUE,
+#                           threshold=quote(stopLossPercent)),
+#          enabled=StopLossFlag,
+#          storefun=FALSE)
+# 
+# # StopTrailing Rule
+# add.rule(strategy  =strat,
+#          name="ruleSignal",
+#          type="chain", parent="EnterLONG",
+#          label="StopTrailingLONG",
+#          path.dep=TRUE,
+#          arguments = list(sigcol="fgu", 
+#                           sigval=TRUE,
+#                           replace=FALSE,
+#                           orderqty="all",
+#                           orderside="long",
+#                           TxnFees=brokerFee,
+#                           ordertype="stoptrailing",
+#                           orderset='ocolong',
+#                           tmult=TRUE,
+#                           threshold=quote(stopLossPercent)),
+#          enabled=StopTrailingFlag,
+#          storefun=FALSE)
 
 ######################## SHORT RULES #########################################
 # Enter Rule
@@ -239,7 +250,8 @@ add.rule(strategy  = strat,
                           orderset='ocoshort',
                           osFUN     = 'osMaxPos'),
          type      = 'enter',
-         label     = 'EnterSHORT')
+         label     = 'EnterSHORT',
+         storefun=FALSE)
 
 #Exit Rule
 add.rule(
@@ -253,62 +265,66 @@ add.rule(
                      orderset='ocoshort',
                      orderside  = 'short'),
     type      = 'exit',
-    label     = 'ExitSHORT')
+    label     = 'ExitSHORT',
+    storefun=FALSE)
 
-# Take Profit
-add.rule(strategy  =strat, 
-         name = 'ruleSignal',
-         arguments=list(sigcol='fld' , 
-                        sigval=TRUE,
-                        replace=FALSE,
-                        orderside='short',
-                        TxnFees=brokerFee,
-                        ordertype='limit', 
-                        tmult=TRUE, 
-                        threshold=quote(takeProfitPercent),
-                        orderqty='all',
-                        orderset='ocoshort'),
-         type='chain', 
-         parent='EnterSHORT',
-         label='TakeProfitSHORT',
-         enabled=takeProfitFlag)
-
-
-# Stop Loss Rule
-add.rule(strategy  =strat,
-         name="ruleSignal",
-         type="chain", parent="EnterSHORT",
-         label="StopLossSHORT",
-         path.dep=TRUE,
-         arguments = list(sigcol="fld", 
-                          sigval=TRUE,
-                          replace=FALSE,
-                          orderqty="all",
-                          TxnFees=brokerFee,
-                          orderside="short",
-                          orderset='ocoshort',
-                          ordertype="stoplimit",
-                          tmult=TRUE,
-                         threshold=quote(stopLossPercent)),
-         enabled=StopLossFlag)
-
-# StopTrailing Rule
-add.rule(strategy  =strat,
-         name="ruleSignal",
-         type="chain", parent="EnterSHORT",
-         label="StopTrailingSHORT",
-         path.dep=TRUE,
-         arguments = list(sigcol="fld", 
-                          sigval=TRUE,
-                          replace=FALSE,
-                          orderqty="all",
-                          orderside="short",
-                          TxnFees=brokerFee,
-                          ordertype="stoptrailing",
-                          orderset='ocoshort',
-                          tmult=TRUE,
-                          threshold=quote(stopLossPercent)),
-         enabled=StopTrailingFlag)
+# # Take Profit
+# add.rule(strategy  =strat, 
+#          name = 'ruleSignal',
+#          arguments=list(sigcol='fld' , 
+#                         sigval=TRUE,
+#                         replace=FALSE,
+#                         orderside='short',
+#                         TxnFees=brokerFee,
+#                         ordertype='limit', 
+#                         tmult=TRUE, 
+#                         threshold=quote(takeProfitPercent),
+#                         orderqty='all',
+#                         orderset='ocoshort'),
+#          type='chain', 
+#          parent='EnterSHORT',
+#          label='TakeProfitSHORT',
+#          enabled=takeProfitFlag,
+#          storefun=FALSE)
+# 
+# 
+# # Stop Loss Rule
+# add.rule(strategy  =strat,
+#          name="ruleSignal",
+#          type="chain", parent="EnterSHORT",
+#          label="StopLossSHORT",
+#          path.dep=TRUE,
+#          arguments = list(sigcol="fld", 
+#                           sigval=TRUE,
+#                           replace=FALSE,
+#                           orderqty="all",
+#                           TxnFees=brokerFee,
+#                           orderside="short",
+#                           orderset='ocoshort',
+#                           ordertype="stoplimit",
+#                           tmult=TRUE,
+#                          threshold=quote(stopLossPercent)),
+#          enabled=StopLossFlag,
+#          storefun=FALSE)
+# 
+# # StopTrailing Rule
+# add.rule(strategy  =strat,
+#          name="ruleSignal",
+#          type="chain", parent="EnterSHORT",
+#          label="StopTrailingSHORT",
+#          path.dep=TRUE,
+#          arguments = list(sigcol="fld", 
+#                           sigval=TRUE,
+#                           replace=FALSE,
+#                           orderqty="all",
+#                           orderside="short",
+#                           TxnFees=brokerFee,
+#                           ordertype="stoptrailing",
+#                           orderset='ocoshort',
+#                           tmult=TRUE,
+#                           threshold=quote(stopLossPercent)),
+#          enabled=StopTrailingFlag,
+#          storefun=FALSE)
 
 ######################## NO OVERNIGHT RULES #########################################
 add.rule(
@@ -321,11 +337,12 @@ add.rule(
                      ordertype  = 'market'),
     type      = 'exit',
     label     = 'CloseOpenPos',
-    enabled   = intraDay)
+    enabled   = intraDay,
+    storefun=FALSE)
 
 ############################# APPLY STRATEGY ################################
 
-applyStrategy(strat, port, prefer='Close', verbose=FALSE)
+applyStrategy(strat, port, prefer='Close', debug=TRUE)
 
 ############################# UPDATE ########################################
 
@@ -344,8 +361,6 @@ dStats = dailyStats(port)                                  #########
 tStats[,4:ncol(tStats)] <- round(tStats[,4:ncol(tStats)], 2)
 #Trades Statistics
 print(data.frame(t(tStats[,-c(1,2)])))
-write.csv(data.frame(t(tStats[,-c(1,2)])),paste(fast, slow, sd,from, to,".csv", sep="_"))
-
 
 #Daily Statistics
 print(t(dStats))
@@ -360,9 +375,9 @@ theme$col$dn.border<-'#FAAC58'
 
 # Absolute Cumulutive P/L
 chart.Posn(port, symbol,
-           theme=theme,
-           #Dates="2014-12-10/2014-12-10", 
-           TA=c("add_SMA(n=fast)","add_BBands(n=slow, sd=sd)"))
+           theme=theme)
+#Dates="2014-12-10/2014-12-10", 
+#TA=c("add_SMA(n=fast)","add_BBands(n=slow, sd=sd)"))
 
 # Maximum Adverse Execursion
 chart.ME(Portfolio=port,
@@ -392,10 +407,10 @@ Sys.time()-timerS
 
 timerS<-Sys.time()
 
-fast = 5:10
-slow = 30
-sd=0.1
-#sd=seq(0.1,0.3, by=0.1)
+dfast = seq(5,15, by=2)
+dslow = seq(25,45, by=5)
+#sd=0.1
+dsd=seq(0.1,0.5, by=0.2)
 #stopLossPercent = seq(0.01,0.01,by=0.001)
 #takeProfitPercent = seq(0.01,0.05,by=0.01)
 
@@ -403,21 +418,21 @@ add.distribution(strat,
                  paramset.label = 'BBOPT', 
                  component.type = 'indicator', 
                  component.label = 'fast', 
-                 variable = list(n = fast), 
+                 variable = list(n = dfast), 
                  label = 'fast') 
 
 add.distribution(strat, 
                  paramset.label = 'BBOPT', 
                  component.type = 'indicator', 
                  component.label = 'bb', 
-                 variable = list(n = slow), 
+                 variable = list(n = dslow), 
                  label = 'slow') 
- 
+
 add.distribution(strat, 
                  paramset.label = 'BBOPT', 
                  component.type = 'indicator', 
                  component.label = 'bb', 
-                 variable = list(sd = sd), 
+                 variable = list(sd = dsd), 
                  label = 'sd') 
 # 
 # # Stop Loss
@@ -465,22 +480,22 @@ add.distribution(strat,
 #                             label="TakeProfitEq")
 
 library(foreach) 
+library(doParallel)
 #library(parallel)
 cores<-detectCores()
 
- if( Sys.info()['sysname'] == "Windows" )
- {
-#      library(doParallel)
-#      cl <- makeCluster(cores)
-#      registerDoParallel(cl)
-     library(doRedis)
-     registerDoRedis(queue = "jobs", host = "192.168.137.1",port = 6379)
-     startLocalWorkers(n=cores, queue="jobs", host = "192.168.137.1",port = 6379)
-     
- } else {
-     library(doMC)
-     registerDoMC(cores=cores)
- }
+if( Sys.info()['sysname'] == "Windows" )
+{
+    cl <- makeCluster(cores)
+    registerDoParallel(cl)
+    #library(doRedis)
+    #registerDoRedis(queue = "jobs", host = "192.168.137.1",port = 6379)
+    #startLocalWorkers(n=cores, queue="jobs", host = "192.168.137.1",port = 6379)
+    
+} else {
+    library(doMC)
+    registerDoMC(cores=cores)
+}
 #registerDoSEQ() # NO PARALLEL
 # 
 # grep<-function (pattern, x, ignore.case = FALSE, perl = FALSE, value = TRUE, 
@@ -489,23 +504,17 @@ cores<-detectCores()
 
 
 results<-apply.paramset(strategy.st=strat, 
-                          paramset.label='BBOPT', 
-                          portfolio.st=port, 
-                          account.st=acct,
-                          verbose=TRUE) 
+                        paramset.label='BBOPT', 
+                        portfolio.st=port, 
+                        account.st=acct,
+                        nsamples=0,
+                        verbose=TRUE) 
 
 removeQueue ("jobs")
 
-df<-data.frame((results$tradeStats))
-df[order(df[,10]),c(1,2,3,4,5,8,9,10)]  
-Sys.time()-timerS
-
-
-df[order(df[,10]),] 
-
-
-
-
+df<-data.table((results$tradeStats))
+df[order(-Net.Trading.PL)]
+df[,max(Net.Trading.PL), by=Symbol]
 
 #qplot(x=Max.Drawdown, y=Net.Trading.PL, colour=Num.Trades,data=df, facets=.~Symbol)
 # 

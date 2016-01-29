@@ -7,7 +7,7 @@ library(data.table)
 #environment(sigTimestamp)<- environment(sigCrossover)
 
 options(digits.secs=0)
-######## RI 1min Gap strategy ##############
+######### RI 1min Gap strategy ##############
 #' Гипотеза: после открытия сессии на RI (утром) заходить в сторону импульса (если он есть).
 #' Стратегия: если 1-я минута > 500 пунктов, встать в ту же сторону на 15 минут.
 #' Для иллюстрации, псевдо-код, работающий по открытиям свечей:
@@ -21,7 +21,7 @@ options(digits.secs=0)
 Sys.setenv(TZ="UTC")
 period="1min"
 symbol<-c("Ri")
-setwd("F:/TRADE/R/trading/sandBox/rltrading/ML")
+setwd("/ML")
 assign(symbol, fread("Ri.txt", stringsAsFactors = FALSE))
 get(symbol)[,Time:=as.character(Time)]
 get(symbol)[,delay:=get(symbol)[,.(paste(Date,Time),
@@ -39,6 +39,28 @@ assign(symbol,
 
 assign(symbol,get(symbol)["T10:00/T10:35"])
 assign(symbol,get(symbol)["2006/"])
+
+
+##########################Data from MFD #############################
+from<-as.Date("2015-12-16")
+to<-Sys.Date()
+period="1min"
+symbols<-c("SiH6 (03.2016)",
+           "RIH6 (03.2016)")
+
+from<-as.Date("2015-09-16")
+to<-as.Date("2015-12-15")#Sys.Date()
+period="1min"
+symbols<-c("SiZ5 (12.2015)",
+           "RIZ5 (12.2015)")
+
+for(s in symbols)
+    getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
+symbols<-toupper(symbols)
+
+symbol<-symbols[2]
+assign(symbol,get(symbol)["T10:00/T10:35"])
+
 ############################# DEFINE QUANTSTRAT VARIABLES ##############################
 if (!exists('.blotter')) .blotter <- new.env()
 if (!exists('.strategy')) .strategy <- new.env()
@@ -49,10 +71,12 @@ acct          = 'riAcct'
 strat         = "riStrat"
 initEq        = 100000
 initDate      = '1969-12-31'
-openTradeTime = "10:01"
-closeTradeTime= "10:20"
-deltaLag      = 3
+deltaPeriod   = 2  # in minutes  - period to measure delta Delt(Open, Close, k = deltaPeriod)
+openLag       = 3  # in minutes / 59 max - how long we wait from Market Opening (10:00) open open postion
+openLag       = max(deltaPeriod, openLag)
+holdPostion   = 27 # in minutes / 59 max - how long we from Market Opening (10:00) to close position.
 deltaThreshold= 0.005 # = (Close-Open)/Open
+
 StopLossFlag  = FALSE
 stopLossPercent= 0.25/100
 StopTrailingFlag = FALSE
@@ -86,14 +110,16 @@ strategy(strat, store=TRUE)
 ############################# INDICATORS ####################################
 
 # OpenCloseDelta
-add.indicator(strat, name='OpCl', label='OpCl', 
-              arguments = list(x=quote(OHLC(mktdata))),
+add.indicator(strat, name='Delt', label='Delt', 
+              arguments = list(x1=quote(Op(mktdata)),
+                               x2=quote(Cl(mktdata)),
+                               k=deltaPeriod),
               storefun=FALSE)
 ############################# SIGNALS #######################################
 add.signal(strat, 
            name='sigThreshold', 
            label= 'dltbuy', 
-           arguments = list(column='OpCl', 
+           arguments = list(column='Delt', 
                             threshold=deltaThreshold, 
                             relationship='gt'),
            storefun=FALSE)
@@ -101,7 +127,7 @@ add.signal(strat,
 add.signal(strat, 
            name='sigThreshold', 
            label= 'dltsell', 
-           arguments = list(column='OpCl', 
+           arguments = list(column='Delt', 
                             threshold= -deltaThreshold, 
                             relationship='lt'),
            storefun=FALSE)
@@ -109,7 +135,7 @@ add.signal(strat,
 add.signal(strat,
            name='sigTimestamp',
            label='ttopen',
-           arguments=list(timestamp=openTradeTime),
+           arguments=list(timestamp=paste(10, formatC(openLag,width=2, flag="0"), sep=":")),
            storefun=FALSE)
 
 add.signal(strat,
@@ -126,8 +152,8 @@ add.signal(strat,
 
 add.signal(strat,
            name='sigTimestamp',
-           label='tmclose',
-           arguments=list(timestamp=closeTradeTime),
+           label='ttclose',
+           arguments=list(timestamp=paste(10, formatC(openLag+holdPostion,width=2, flag="0"), sep=":")),
            storefun=FALSE)
 
 ########################## RULES ############################################
@@ -152,7 +178,7 @@ add.rule(strategy  =strat,
          name='ruleSignal', 
          type='exit', 
          label='ExitLONG',
-         arguments=list(sigcol='tmclose', 
+         arguments=list(sigcol='ttclose', 
                         sigval=TRUE, 
                         orderqty ='all', 
                         ordertype='market',
@@ -181,7 +207,7 @@ add.rule(strategy  = strat,
 add.rule(
     strategy  = strat,
     name      = 'ruleSignal',
-    arguments = list(sigcol     = 'tmclose',
+    arguments = list(sigcol     = 'ttclose',
                      sigval     = TRUE,
                      orderqty   = 'all',
                      ordertype  = 'market',
@@ -261,42 +287,52 @@ Sys.time()-timerS
 
 timerS<-Sys.time()
 
-#deltaThreshold = seq(0.005, 0.006,by=0.001)
-openTradeTimeDist =paste(10, formatC(1:10,width=2, flag="0"), sep=":")
-closeTradeTimeDist =paste(10, formatC(15:25,width=2, flag="0"), sep=":")
+deltaThreshold = seq(0.006, 0.006,by=0.001)
+deltaPeriod = seq(2, 2,by=1)
+openLag = seq(3, 3,by=1)
+holdPostion = seq(25, 35,by=1)
+
 #sd=seq(0.1,0.3, by=0.1)
 #stopLossPercent = seq(0.01,0.01,by=0.001)
 #takeProfitPercent = seq(0.01,0.05,by=0.01)
 
+add.distribution(strat, 
+                 paramset.label = 'POPT', 
+                 component.type = 'indicator', 
+                 component.label = 'Delt', 
+                 variable = list( k= deltaPeriod), 
+                 label = 'ddelt') 
 
-# add.distribution(strat, 
-#                  paramset.label = 'POPT', 
-#                  component.type = 'signal', 
-#                  component.label = 'dltbuy', 
-#                  variable = list( threshold= deltaThreshold), 
-#                  label = 'dbuy') 
-# 
-# add.distribution(strat, 
-#                  paramset.label = 'POPT', 
-#                  component.type = 'signal', 
-#                  component.label = 'dltsell', 
-#                  variable = list( threshold= -deltaThreshold), 
-#                  label = 'dsell') 
+
+
+add.distribution(strat, 
+                 paramset.label = 'POPT', 
+                 component.type = 'signal', 
+                 component.label = 'dltbuy', 
+                 variable = list( threshold= deltaThreshold), 
+                 label = 'dbuy') 
+
+add.distribution(strat, 
+                 paramset.label = 'POPT', 
+                 component.type = 'signal', 
+                 component.label = 'dltsell', 
+                 variable = list( threshold= -deltaThreshold), 
+                 label = 'dsell') 
 
 
 add.distribution(strat, 
                  paramset.label = 'POPT', 
                  component.type = 'signal', 
                  component.label = 'ttopen', 
-                 variable = list( timestamp=openTradeTimeDist), 
-                 label = 'topen') 
+                 variable = list( timestamp=paste(10, formatC(openLag,width=2, flag="0"), sep=":")), 
+                 label = 'dtopen') 
 # 
 add.distribution(strat, 
                  paramset.label = 'POPT', 
                  component.type = 'signal', 
-                 component.label = 'tmclose', 
-                 variable = list( timestamp=closeTradeTimeDist),
-                 label = 'tclose')
+                 component.label = 'ttclose', 
+                 variable = list( timestamp=paste(10, formatC(openLag+holdPostion,width=2, flag="0"), sep=":")),
+                 label = 'dtclose')
 # 
 # add.distribution.constraint(strat, 
 #                             paramset.label = 'POPT',
@@ -317,7 +353,7 @@ if( Sys.info()['sysname'] == "Windows" )
 
            cl <- makeCluster(cores)
            registerDoParallel(cl)
-           registerDoSEQ() # NO PARALLEL
+           #registerDoSEQ() # NO PARALLEL
           
               #library(doRedis)
     #registerDoRedis(queue = "jobs", host = "192.168.137.1",port = 6379)
