@@ -3,7 +3,11 @@ library(quantstrat)
 # Bumblebee trading system
 # copyright (c) 2009-2013, Algorithm Alpha, LLC
 # RUSSIAN MARKET INTRADAY
+<<<<<<< HEAD
 ### WITH STOP LOSS
+=======
+# WITH STOP LOSS
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 Sys.setenv(TZ="UTC")
 timerS<-Sys.time()
 ############################# GET DATA ######################################
@@ -11,6 +15,7 @@ from<-as.Date("2015-12-16")
 to<-Sys.Date()
 period="1min"
 symbols<-c("SiH6 (03.2016)",
+<<<<<<< HEAD
            #"SRH6 (03.2016)",
            #"GZH6 (03.2016)",
            "RIH6 (03.2016)")
@@ -22,6 +27,19 @@ symbols<-c("SiH6 (03.2016)",
 #            #"SRZ5 (12.2015)",
 #            #"GZZ5 (12.2015)",
 #            "RIZ5 (12.2015)")
+=======
+            #"SRH6 (03.2016)",
+            #"GZH6 (03.2016)",
+            "RIH6 (03.2016)")
+
+from<-as.Date("2015-09-16")
+to<-as.Date("2015-12-15")#Sys.Date()
+period="1min"
+symbols<-c("SiZ5 (12.2015)",
+           #"SRZ5 (12.2015)",
+           #"GZZ5 (12.2015)",
+           "RIZ5 (12.2015)")
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 # 
 #For stock names in Russian
 #Sys.setlocale(category = "LC_ALL", locale = "Russian")
@@ -45,10 +63,17 @@ acct          = 'bumblebeeAcct'
 strat         = "bumblebee"
 initEq        = 100000
 initDate      = from
+<<<<<<< HEAD
 fast          = 15
 slow          = 45
 sd            = 0.1
 EndOFDatTime  ="18:40"
+=======
+fast          = 10
+slow          = 45
+sd            = 0.3
+EndOFDatTime  ="23:45"
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 intraDay      = TRUE
 StopLossFlag  = TRUE
 stopLossPercent= 0.20/100
@@ -138,7 +163,11 @@ add.signal(strat,
            label='endday',
            arguments=list(timestamp=EndOFDatTime),
            storefun=FALSE)
+<<<<<<< HEAD
 
+=======
+           
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 ############################# RULES #########################################
 
 # Just imagine fat bumblebee. It's trying to fly.
@@ -376,8 +405,13 @@ theme$col$dn.border<-'#FAAC58'
 # Absolute Cumulutive P/L
 chart.Posn(port, symbol,
            theme=theme)
+<<<<<<< HEAD
 #Dates="2014-12-10/2014-12-10", 
 #TA=c("add_SMA(n=fast)","add_BBands(n=slow, sd=sd)"))
+=======
+           #Dates="2014-12-10/2014-12-10", 
+           #TA=c("add_SMA(n=fast)","add_BBands(n=slow, sd=sd)"))
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 
 # Maximum Adverse Execursion
 chart.ME(Portfolio=port,
@@ -407,10 +441,17 @@ Sys.time()-timerS
 
 timerS<-Sys.time()
 
+<<<<<<< HEAD
 dfast = seq(5,15, by=2)
 dslow = seq(25,45, by=5)
 #sd=0.1
 dsd=seq(0.1,0.5, by=0.2)
+=======
+dfast = seq(5,7, by=2)
+dslow = seq(25,30, by=5)
+#sd=0.1
+dsd=seq(0.3,0.5, by=0.2)
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 #stopLossPercent = seq(0.01,0.01,by=0.001)
 #takeProfitPercent = seq(0.01,0.05,by=0.01)
 
@@ -484,6 +525,7 @@ library(doParallel)
 #library(parallel)
 cores<-detectCores()
 
+<<<<<<< HEAD
 if( Sys.info()['sysname'] == "Windows" )
 {
     cl <- makeCluster(cores)
@@ -496,6 +538,20 @@ if( Sys.info()['sysname'] == "Windows" )
     library(doMC)
     registerDoMC(cores=cores)
 }
+=======
+ if( Sys.info()['sysname'] == "Windows" )
+ {
+      cl <- makeCluster(cores)
+      registerDoParallel(cl)
+     #library(doRedis)
+     #registerDoRedis(queue = "jobs", host = "192.168.137.1",port = 6379)
+     #startLocalWorkers(n=cores, queue="jobs", host = "192.168.137.1",port = 6379)
+     
+ } else {
+     library(doMC)
+     registerDoMC(cores=cores)
+ }
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 #registerDoSEQ() # NO PARALLEL
 # 
 # grep<-function (pattern, x, ignore.case = FALSE, perl = FALSE, value = TRUE, 
@@ -504,17 +560,29 @@ if( Sys.info()['sysname'] == "Windows" )
 
 
 results<-apply.paramset(strategy.st=strat, 
+<<<<<<< HEAD
                         paramset.label='BBOPT', 
                         portfolio.st=port, 
                         account.st=acct,
                         nsamples=0,
                         verbose=TRUE) 
+=======
+                          paramset.label='BBOPT', 
+                          portfolio.st=port, 
+                          account.st=acct,
+                          nsamples=0,
+                          verbose=TRUE) 
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 
 removeQueue ("jobs")
 
 df<-data.table((results$tradeStats))
+<<<<<<< HEAD
 df[order(-Net.Trading.PL)]
 df[,max(Net.Trading.PL), by=Symbol]
+=======
+df[,max(Net.Trading.PL), by=.(Symbol)]
+>>>>>>> e73689bcbf67fb4403f3627ca680c27918dd961d
 
 #qplot(x=Max.Drawdown, y=Net.Trading.PL, colour=Num.Trades,data=df, facets=.~Symbol)
 # 
