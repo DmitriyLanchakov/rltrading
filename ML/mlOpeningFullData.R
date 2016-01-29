@@ -15,7 +15,11 @@ dt[, DateTime:=as.POSIXct(strptime(DateTime, format="%m/%d/%y %H%M"))]
 daydt<-dt[,.(PriceMinDay=min(Close),
              PriceMaxDay=max(Close),
              PriceOpenDay=Open[1], 
-             PriceCloseDay=Close[.N]),
+             PriceCloseDay=Close[.N],
+             TimeOpen=Time[1],
+             CloseTimeOpen=Close[1],
+             OpenTimeOpen=Open[1]),
+          
           by=Date]
 
 daydt[,':='(PriceMinPrevDay=shift(PriceMinDay,1, type="lag"),
