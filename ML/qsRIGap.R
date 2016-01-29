@@ -41,25 +41,25 @@ assign(symbol,get(symbol)["T10:00/T10:35"])
 assign(symbol,get(symbol)["2006/"])
 
 
-##########################Data from MFD #############################
-from<-as.Date("2015-12-16")
-to<-Sys.Date()
-period="1min"
-symbols<-c("SiH6 (03.2016)",
-           "RIH6 (03.2016)")
-
-from<-as.Date("2015-09-16")
-to<-as.Date("2015-12-15")#Sys.Date()
-period="1min"
-symbols<-c("SiZ5 (12.2015)",
-           "RIZ5 (12.2015)")
-
-for(s in symbols)
-    getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
-symbols<-toupper(symbols)
-
-symbol<-symbols[2]
-assign(symbol,get(symbol)["T10:00/T10:35"])
+# ##########################Data from MFD #############################
+# from<-as.Date("2015-12-16")
+# to<-Sys.Date()
+# period="1min"
+# symbols<-c("SiH6 (03.2016)",
+#            "RIH6 (03.2016)")
+# 
+# from<-as.Date("2015-09-16")
+# to<-as.Date("2015-12-15")#Sys.Date()
+# period="1min"
+# symbols<-c("SiZ5 (12.2015)",
+#            "RIZ5 (12.2015)")
+# 
+# for(s in symbols)
+#     getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
+# symbols<-toupper(symbols)
+# 
+# symbol<-symbols[2]
+# assign(symbol,get(symbol)["T10:00/T10:35"])
 
 ############################# DEFINE QUANTSTRAT VARIABLES ##############################
 if (!exists('.blotter')) .blotter <- new.env()
@@ -70,7 +70,7 @@ port          = 'riPort'
 acct          = 'riAcct'
 strat         = "riStrat"
 initEq        = 100000
-initDate      = '1969-12-31'
+initDate      = index(get(symbol)[1])
 deltaPeriod   = 2  # in minutes  - period to measure delta Delt(Open, Close, k = deltaPeriod)
 openLag       = 3  # in minutes / 59 max - how long we wait from Market Opening (10:00) open open postion
 openLag       = max(deltaPeriod, openLag)
@@ -273,6 +273,46 @@ chart.ME(Portfolio=port,
 
 # Returns
 charts.PerformanceSummary(PortfReturns(acct))
+
+# Returns by year
+pRet<-data.table(index(PortfReturns(acct)),PortfReturns(acct))
+pRet[,V1:=as.POSIXct(V1)]
+setnames(pRet, c("DateTime", "Return"))
+qplot(x=Day, y=YearCumReturn,
+      color=factor(year),
+      geom=c("line", "point"),
+      data=pRet[,.(YearCumReturn=cumsum(Return),Day=yday(DateTime)), by=year(DateTime)])
+
+
+# PL by year
+pPL<-data.table(index(getPortfolio(port)$symbols[[symbol]]$posPL$Net.Trading.PL),
+                getPortfolio(port)$symbols[[symbol]]$posPL$Net.Trading.PL)
+pPL[,V1:=as.POSIXct(V1)]
+
+setnames(pPL, c("DateTime", "PL"))
+pPL[,TradeFlag:=PL>0]
+pPL[,cumPL:=cumsum(PL)]
+
+qplot(x=DateTime, y=cumPL,
+      geom=c("line"),
+      data=pPL)
+
+qplot(x=Day, y=YearCumPL,
+      color=factor(year),
+      geom=c("line"),
+      data=pPL[,.(YearCumPL=cumsum(PL),Day=yday(DateTime)), by=year(DateTime)])
+
+# NumTrades by year
+pNT<-data.table(index(getPortfolio(port)$symbols[[symbol]]$posPL$Net.Trading.PL),
+                getPortfolio(port)$symbols[[symbol]]$posPL$Net.Trading.PL)
+pNT[,V1:=as.POSIXct(V1)]
+setnames(pNT, c("DateTime", "PL"))
+pNT[,TradeFlag:=PL>0]
+
+qplot(x=Day, y=YearCumNumTrades,
+      color=factor(year),
+      geom=c("line"),
+      data=pNT[,.(YearCumNumTrades=cumsum(TradeFlag),Day=yday(DateTime)), by=year(DateTime)])
 
 
 Sys.time()-timerS
