@@ -6,7 +6,7 @@ fname<-"~/repos/DATA/"
 setwd(fname)
 #Header 
 # Received;ExchTime;OrderId;Price;Amount;AmountRest;DealId;DealPrice;OI;Flags
-fname<-"OrdLog.Si-3.16.2016-02-12.{1-OrdLog}.txt"
+fname<-"OrdLog.Si-3.16.2016-03-03.{1-OrdLog}.txt"
 orderlog<-fread(fname,skip=3, sep=";",stringsAsFactors=FALSE, header=FALSE)# nrows=1000000)
 
 
@@ -44,11 +44,50 @@ dtFormat<-"%d.%m.%Y %H:%M:%OS"
 orderlog[,"datetime":=as.POSIXct(strptime(ExchTime,dtFormat))]
 orderlog<-orderlog[datetime>=as.POSIXct(paste(format(orderlog[.N,datetime], "%Y-%m-%d"),
                                               "10:00:00.000"))]
-#orderlog[,"id":=1:.N]
-#orderlog[,"pid":=id]
-# Remove NonSystem orders
-orderlog<-orderlog[,Active:=sum(NonSystem)==0,by=OrderId][Active==TRUE]
-orderlog[,"Active":=NA]
+
+olCancelled<-orderlog[,oCanceled:=sum(Canceled)>=1 | 
+                          sum(CanceledGroup)>=1 | 
+                          sum(Moved)>=1,
+                      by=OrderId][oCanceled==TRUE]
+
+
+olCancelledGr<-olCancelled[,.(.SD[Add==TRUE,datetime],
+                              .SD[Add==TRUE,Buy],.SD[Add==TRUE,Sell],
+               .SD[Canceled==TRUE | CanceledGroup==TRUE | Moved==TRUE,datetime]-
+                   .SD[Add==TRUE,datetime],.SD[Add==TRUE,Price],
+               .SD[Add==TRUE,Amount]),by=OrderId]
+
+
+setnames(olCancelledGr,c("Id","datetime","buy","sell","lifetime", "price","volume"))
+olCancelledGr[,lifetime:=as.numeric(lifetime)]
+olCancelledGr[,buysell:=ifelse(buy==TRUE,"buy","sell")]
+olCancelledGr[lifetime<0.01]
+library(ggplot2)
+#' Вопросы
+#' 1. В какой срок снимается большинство заявок?
+olCancelledGr[,.(.N,Vol=sum(volume)),by=.(buysell,lifetime)][order(-N)][N>100000]
+olCancelledGr[,.(.N,Vol=sum(volume)),by=.(buysell,lifetime)][order(-Vol)][N>100000]
+olCancelledGr[,.(.N),by=.(buysell,lifetime, volume)][order(-N)][N>100000]
+
+ggplot(olCancelledGr[,.N,
+                     by=.(buysell,lifetime)][order(-N)][N>100000])+
+    geom_bar(aes(round(lifetime,3),weight=N, fill=buysell),position="dodge",width=.001)
+
+
+#' 2. Как распределена активность снятия завок во времени?
+olCancelledGr[lifetime<0.005,.(.N,sum(volume)),by=.(buysell,tid=format(datetime, "%H%M%S"))][order(-N)]
+ggplot(data=olCancelledGr[lifetime<0.005,.(.N,Vol=sum(volume)),by=.(buysell,tid=format(datetime, "%H%M%S"))],
+       aes(x=tid,y=Vol,group=buysell,colour=buysell))+
+    geom_line()+geom_point()+scale_x_discrete(breaks = seq(100000,230000,10000))
+
+#' 3. Какая привязка к ценам (исполнения, стакана)?
+tick<-orderlog[][DealId>0 & EndOfTransaction,.(datetime, DealPrice, Amount), by=DealId]
+
+
+#' 
+
+
+
 
 
 ##########NEW################################3

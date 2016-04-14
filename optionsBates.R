@@ -17,7 +17,7 @@ library(rusquant)
 
 # MOEX Option Desk for current datetime
 symbol<-"Si-3.16"
-expDate<-"2016-01-21"
+expDate<-"2016-03-15"
 period="1min"
 symb<-"SiH6 (03.2016)"
 link<-paste("http://moex.com/ru/derivatives/optionsdesk-csv.aspx?code=",
@@ -120,8 +120,17 @@ LastPriceSymb<-data.table(getSymbols(symb, from=curOpDesk$DateTime[1], period=pe
 curOpDesk[,StockPriceMid:=LastPriceSymb[,(Open+High+Low+Close)/4]]
 curOpDesk[,c("PRICE", "tau"):=.((Bid+Ask)/2,
                                 as.numeric((as.POSIXct(expDate)-DateTime)/365))]
+curOpDesk[,c("PRICEBid", "tau"):=.(Bid,
+                                as.numeric((as.POSIXct(expDate)-DateTime)/365))]
+
+curOpDesk[,c("PRICEAsk", "tau"):=.(Ask,
+                                   as.numeric((as.POSIXct(expDate)-DateTime)/365))]
+
 curOpDesk[,id:=.I]
 curOpDesk<-curOpDesk[PRICE<TheoPrice*1.2 & PRICE>TheoPrice*0.8]
+curOpDesk<-curOpDesk[PRICEBid<TheoPrice*1.2 & PRICEBid>TheoPrice*0.8]
+curOpDesk<-curOpDesk[PRICEAsk<TheoPrice*1.2 & PRICEAsk>TheoPrice*0.8]
+
 curOpDesk[,GBSIVBidAsk:=GBSVolatility(price=PRICE, 
                                 TypeFlag = strtrim(tolower(TypeFlag),1), 
                                 S=StockPriceMid,
@@ -130,6 +139,27 @@ curOpDesk[,GBSIVBidAsk:=GBSVolatility(price=PRICE,
                                 r=0,
                                 b=0,
                                 maxiter=100), by=id]
+
+
+curOpDesk[,GBSIVBid:=GBSVolatility(price=PRICEBid, 
+                                      TypeFlag = strtrim(tolower(TypeFlag),1), 
+                                      S=StockPriceMid,
+                                      X=Strike,
+                                      Time=as.numeric(tau),
+                                      r=0,
+                                      b=0,
+                                      maxiter=100), by=id]
+
+curOpDesk[,GBSIVAsk:=GBSVolatility(price=PRICEAsk, 
+                                   TypeFlag = strtrim(tolower(TypeFlag),1), 
+                                   S=StockPriceMid,
+                                   X=Strike,
+                                   Time=as.numeric(tau),
+                                   r=0,
+                                   b=0,
+                                   maxiter=100), by=id]
+
+
 curOpDesk[,GBSIVCalc:=GBSVolatility(price=CalcPrice, 
                                     TypeFlag = strtrim(tolower(TypeFlag),1), 
                                     S=StockPriceMid,
@@ -148,7 +178,7 @@ curOpDesk[,GBSIVTheo:=GBSVolatility(price=TheoPrice,
                                     maxiter=100), by=id]
 
 #Plot Hist GBS Volatility Smile
-nStrikes<-35
+nStrikes<-25
 StrikeStep<-250
 MaxStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep+nStrikes*StrikeStep
 MinStrike<-floor(LastPriceSymb$Close/StrikeStep)*StrikeStep-nStrikes*StrikeStep
@@ -157,32 +187,47 @@ ggplot()+
     #geom_line(data=histOptData[GBSIV<1],aes(x=Strike,y=GBSIV*100,colour=format(DateTime,"%d %H")))+
     geom_line(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
               aes(x=Strike,y=IV),colour="#4b0082")+
-    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
-               aes(x=Strike,y=GBSIVBidAsk*100,shape=factor(TypeFlag), size=OI),colour="indianred")+
+#     geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+#                aes(x=Strike,y=GBSIVBidAsk*100,shape=factor(TypeFlag), size=OI),colour="indianred")+
     geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
                 aes(x=Strike,y=GBSIVBidAsk*100),colour="indianred")+
-#    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+
+  geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+             aes(x=Strike,y=GBSIVBid*100,shape=factor(TypeFlag), size=OI),colour="darkgreen")+
+  geom_line(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+              aes(x=Strike,y=GBSIVBid*100),colour="darkgreen")+
+  
+  
+  
+  geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+             aes(x=Strike,y=GBSIVAsk*100,shape=factor(TypeFlag), size=OI),colour="darkred")+
+  geom_line(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+              aes(x=Strike,y=GBSIVAsk*100),colour="darkred")+
+  
+  #    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
 #               aes(x=Strike,y=GBSIVCalc*100,shape=factor(TypeFlag),size=OI),colour="darkcyan")+
 #    geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
 #                aes(x=Strike,y=GBSIVCalc*100),colour="darkcyan")+
-    geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
-               aes(x=Strike,y=GBSIVTheo*100, shape=factor(TypeFlag),size=OI),colour="forestgreen")+
+#     geom_point(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
+#                aes(x=Strike,y=GBSIVTheo*100, shape=factor(TypeFlag),size=OI),colour="forestgreen")+
     geom_smooth(data=curOpDesk[Strike>=MinStrike &Strike<=MaxStrike],
                 aes(x=Strike,y=GBSIVTheo*100),colour="forestgreen")+
     geom_vline(xintercept=LastPriceSymb$Close)+
     scale_x_continuous(breaks=seq(MinStrike,MaxStrike,StrikeStep*2)) + 
     scale_y_continuous(breaks=seq(1,100,0.25))+
-    annotate("text", label = "Market IV", x = MinStrike*1.2, y = 10, size = 4, colour = "#4b0082")+
-    annotate("text", label = "Bid/Ask IV", x = MinStrike*1.2, y = 11, size = 4, colour = "indianred")+
-    annotate("text", label = "CalcPrice IV", x = MinStrike*1.2, y = 12, size = 4, colour = "darkcyan")+
-    annotate("text", label = "TheoPrice IV", x = MinStrike*1.2, y = 13, size = 4, colour = "forestgreen")
+    annotate("text", label = "Market IV", x = MinStrike+StrikeStep*1, y = 25, size = 4, colour = "#4b0082")+
+  annotate("text", label = "Bid/Ask IV", x = MinStrike+StrikeStep*6, y = 25, size = 4, colour = "indianred")+
+  annotate("text", label = "Bid IV", x = MinStrike+StrikeStep*11, y = 25, size = 4, colour = "darkgreen")+
+  annotate("text", label = "Ask IV", x = MinStrike+StrikeStep*16, y = 25, size = 4, colour = "darkred")+
+  annotate("text", label = "CalcPrice IV", x = MinStrike+StrikeStep*21, y = 25, size = 4, colour = "darkcyan")+
+    annotate("text", label = "TheoPrice IV", x = MinStrike+StrikeStep*26, y = 25, size = 4, colour = "forestgreen")
     
 
 ######################################################################################
 # Stochastic VOL research
 ######################################################################################
 #Load MOEX option trades history
-histDates<-paste("201512", 29:29, sep="")
+histDates<-paste("201602", 17:17, sep="")
 getOptionHitory<-function(histDate){
   link<-paste("ftp://ftp.moex.com/pub/FORTS/pubstat/",
               histDate, "/",
@@ -208,8 +253,8 @@ getOptionHitory<-function(histDate){
 }
 
 tradesOpdf<-rbindlist(lapply(histDates, getOptionHitory))
-tradesOpdf[,tau:=as.numeric(difftime(Expiration,DateTime, "days"))/365]
 tradesOpdf[,id:=.I]
+tradesOpdf[,tau:=as.numeric(difftime(Expiration,DateTime, "days"))/365,by=id]
 
 
 histOptData<-tradesOpdf[Expiration==expDate & Symbol==symbol,.SD,by=Strike]
