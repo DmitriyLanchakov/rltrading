@@ -1,3 +1,10 @@
+#''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+#' Зависимость между ценами  на нефть и доллар/рубль
+#' 
+#' 2016-04-07 | rlukerin@gmail.com
+#' 
+#''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
 library(rusquant)
 library(ggplot2)
 require(scales)
@@ -5,9 +12,9 @@ symbols<-c("@Si",
            "@BR"
            )
 
-from<-"2014-01-01"
+from<-"2016-01-01"
 to<-Sys.Date()
-period<-"day"
+period<-"day" # "1min"
 for(s in symbols)
     getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 

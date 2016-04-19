@@ -1,6 +1,8 @@
 #''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-#' Экспорт истории по инструменту из  архивов сделок по фьючерсам и 
+#' Построение истории по списку инструменту из  архивов сделок по фьючерсам и 
 #' опционам с сайта Московской биржи
+#' 
+#' 
 #' 2016-03-20 | rlukerin@gmail.com
 #''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 #' Месяц	Код фьючерса
@@ -20,12 +22,6 @@
 
 library(data.table)
 options(digits.secs=3)
-
-homeDir<-"~/repos/Data/MOEX/"
-#setwd(homeDir)
-#dirList<-dir()
-#setwd(dirList[14])
-#fileList<-dir()
 getSymbData<-function(symbol, fname){
   futFname<-gsub(".ZIP","ft.csv",gsub("FT","",toupper(fname)))
   unzip(fname, files=futFname)
@@ -34,57 +30,14 @@ getSymbData<-function(symbol, fname){
   secDT[code %in%symbol][, dat_time:=as.POSIXct(strptime(dat_time,format="%Y-%m-%d %H:%M:%OS"))][]
 }
 
-symbList<-c("GZM5", "GZH5")
-symbMonth<-c("F", "G", "H","J","K","M","N","Q","U","V","X","Z")
-symb<-"BR"
 
-years<-2016
-from<-as.Date("2016-03-28")
-to<-as.Date("2016-04-05")
+getSymbol.MOEX<-function(from=as.Date("2016-03-28"), to=as.Date("2016-04-05"),symbList=c("GZM5", "GZH5"), homeDir="~/repos/Data/MOEX/"){
+    
 fileFilter<-paste("FT",format(seq.Date(from=from, to=to, by=1),"%y%m%d"),".zip",sep="")
-
-symbList<-unlist(lapply(years-2010, FUN=function(x)paste(symb,symbMonth,x, sep="")))
-#symbList<-c("MXH6","MMH6","MXM6", "MMM6")
-
 symbDT<-rbindlist(lapply(years,FUN=function(y){
   setwd(paste(homeDir,y,sep=""))
   fileList<-dir()[dir() %in% fileFilter]
   rbindlist(lapply(fileList,FUN=function(f)getSymbData(symbList,f)))}))
 
-
-symbPairs<-lapply(1:length(symbList)-1, FUN=function(x) symbList[x:(x+1)])
-
-
-getSpread<-function(symbPair, coef=1)
-{
-  spreadDT<-symbDT[,median(price), by=.(code, format(dat_time,"%Y%m%d%H%M%S"))]
-  spreadDT<-spreadDT[,.(.N,code, V1),by=format][N>1]
-  spreadDT<-merge(spreadDT[code==symbPair[1]],spreadDT[code==symbPair[2]],by="format")
-  spreadDT[,price:=V1.x-V1.y*coef]
-  spreadDT[,code:=paste(code.x,code.y,sep="")]
-  spreadDT[,datetime:=as.POSIXct(strptime(format,format="%Y%m%d%H%M%S"))]
-  spreadDT[,.(datetime,code, price)]
-  
+symbDT
 }
-
-
-allSpreadDT<-rbindlist(lapply(symbPairs, getSpread,1))
-
-library(ggplot2)
-ggplot(data=allSpreadDT, aes(x=datetime, y=price,color=code))+geom_line()+stat_smooth()+ scale_y_continuous(breaks=seq(0,2,0.1))
-
-
-ret<-allSpreadDT[,quantile(price)[3]-quantile(price)[2],by=code]
-ret[,id:=1:.N]
-qplot(id,fill=code,weight=cumsum(V1),data=ret, geom="bar")
-
-
-ggplot(data=allSpreadDT[code %in% c("BRM6BRN6","BRK6BRM6") ], aes(x=datetime, y=price,color=code))+geom_line()+stat_smooth() +scale_y_continuous(breaks=seq(-2,2,0.1))
-
-#ggplot(data=allSpreadDT[code %in% c("BRG6BRH6")& format(datetime,"%Y%m%d")=="20160201"], aes(x=datetime, y=price,color=code))+geom_line()+stat_smooth()+ scale_y_continuous(breaks=seq(-2,2,0.1))
-#ggplot(data=allSpreadDT[code %in% c("BRH6BRJ6") & format(datetime,"%Y%m%d")=="20160301"], aes(x=datetime, y=price,color=code))+geom_line()+stat_smooth()+ scale_y_continuous(breaks=seq(-2,2,0.1))
-
-
-#ggplot(data=allSpreadDT[code %in% c("MXH6MMH6","MXM6MMM6") & format(datetime,"%Y%m%d")=="20160315"], aes(x=datetime, y=price,color=code))+
-#  geom_point()+stat_smooth()#+ scale_y_continuous(breaks=seq(-2,2,0.1))
-
