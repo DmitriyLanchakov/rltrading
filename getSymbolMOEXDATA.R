@@ -23,21 +23,22 @@
 library(data.table)
 options(digits.secs=3)
 getSymbData<-function(symbol, fname){
-  futFname<-gsub(".ZIP","ft.csv",gsub("FT","",toupper(fname)))
-  unzip(fname, files=futFname)
-  secDT<-fread(futFname, stringsAsFactors = FALSE)
-  file.remove(futFname)
-  secDT[code %in%symbol][, dat_time:=as.POSIXct(strptime(dat_time,format="%Y-%m-%d %H:%M:%OS"))][]
+    futFname<-gsub(".ZIP","ft.csv",gsub("FT","",toupper(fname)))
+    unzip(fname, files=futFname)
+    secDT<-fread(futFname, stringsAsFactors = FALSE)
+    file.remove(futFname)
+    secDT[code %in%symbol][, dat_time:=as.POSIXct(strptime(dat_time,format="%Y-%m-%d %H:%M:%OS"))][]
 }
 
 
 getSymbol.MOEX<-function(from=as.Date("2016-03-28"), to=as.Date("2016-04-05"),symbList=c("GZM5", "GZH5"), homeDir="~/repos/Data/MOEX/"){
     
-fileFilter<-paste("FT",format(seq.Date(from=from, to=to, by=1),"%y%m%d"),".zip",sep="")
-symbDT<-rbindlist(lapply(years,FUN=function(y){
-  setwd(paste(homeDir,y,sep=""))
-  fileList<-dir()[dir() %in% fileFilter]
-  rbindlist(lapply(fileList,FUN=function(f)getSymbData(symbList,f)))}))
-
-symbDT
+    years<-year(from):year(to)    
+    fileFilter<-paste("FT",format(seq.Date(from=from, to=to, by=1),"%y%m%d"),".zip",sep="")
+    symbDT<-rbindlist(lapply(years,FUN=function(y){
+        setwd(paste(homeDir,y,sep=""))
+        fileList<-dir()[dir() %in% fileFilter]
+        rbindlist(lapply(fileList,FUN=function(f)getSymbData(symbList,f)))}))
+    
+    symbDT
 }

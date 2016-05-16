@@ -38,11 +38,11 @@ symbs<-symbs[datetime>downlimit & datetime<uplimit]
 ccf(symbs$symb1Ret,symbs$symb2Ret, lag.max=100)
 
 ggplot(data=symbs)+
-  geom_line(aes(datetime,i.askprice0/(bidprice0*100) -1), colour="mediumaquamarine", alpha=I(0.5))+
-  geom_line(aes(datetime,i.bidprice0/(askprice0*100) -1), colour="lightcoral", alpha=I(0.5))
+    geom_line(aes(datetime,i.askprice0/(bidprice0*100) -1), colour="mediumaquamarine", alpha=I(0.5))+
+    geom_line(aes(datetime,i.bidprice0/(askprice0*100) -1), colour="lightcoral", alpha=I(0.5))
 
-  #geom_point(aes(datetime,price*100), colour="lightcoral", alpha=I(0.5))+
-  #geom_point(aes(datetime,i.price), colour="mediumaquamarine",alpha=I(0.5))
+#geom_point(aes(datetime,price*100), colour="lightcoral", alpha=I(0.5))+
+#geom_point(aes(datetime,i.price), colour="mediumaquamarine",alpha=I(0.5))
 
 # Volume disbalance cross corr test
 
