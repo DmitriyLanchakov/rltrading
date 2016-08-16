@@ -12,10 +12,10 @@ symbols<-c("@Si",
            "@BR"
            )
 
-from<-"2016-04-01"
-to<-"2016-07-31"
+from<-"2016-01-01"
+to<-"2016-08-31"
 to<-Sys.Date()
-period<-"day"
+period<-"5min"
 for(s in symbols)
     getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 
