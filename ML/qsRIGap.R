@@ -21,7 +21,8 @@ options(digits.secs=0)
 Sys.setenv(TZ="UTC")
 period="1min"
 symbol<-c("Ri")
-setwd("/ML")
+setwd("~/repos/rltrading/ML")
+
 assign(symbol, fread("Ri.txt", stringsAsFactors = FALSE))
 get(symbol)[,Time:=as.character(Time)]
 get(symbol)[,delay:=get(symbol)[,.(paste(Date,Time),

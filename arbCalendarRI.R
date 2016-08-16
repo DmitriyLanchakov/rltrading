@@ -22,7 +22,7 @@
 library(data.table)
 options(digits.secs=3)
 
-homeDir<-"~/repos/Data/MOEX/"
+homeDir<-"~/repo/Data/MOEX/"
 #setwd(homeDir)
 #dirList<-dir()
 #setwd(dirList[14])

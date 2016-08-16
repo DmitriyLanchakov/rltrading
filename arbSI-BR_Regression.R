@@ -12,9 +12,10 @@ symbols<-c("@Si",
            "@BR"
            )
 
-from<-"2016-01-01"
+from<-"2016-04-01"
+to<-"2016-07-31"
 to<-Sys.Date()
-period<-"day" # "1min"
+period<-"day"
 for(s in symbols)
     getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 
@@ -27,7 +28,7 @@ df$USDRUB<-df$USDRUB/1000
 qplot(OIL, USDRUB, 
       alpha=0.5,color=factor(yearmonth),data=df,
       #facets= weekNum~.,
-      geom=c("point", "smooth"),
+      geom=c("point", "line","smooth"),
       main="USDRUB / OIL", 
       xlab="OIL", ylab="USDRUB") + scale_x_continuous(breaks=pretty_breaks(n=20)) + scale_y_continuous(breaks=pretty_breaks(n=20))
 

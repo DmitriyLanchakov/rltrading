@@ -3,6 +3,7 @@
 library(data.table)
 library(xts)
 library(yuima)
+library(ggplot2)
 options(digits.secs=3)
 
 
@@ -32,7 +33,7 @@ options(digits.secs=3)
  }
  
  
- findLeadLag<-function(dt=0.001, j=50, symbList)
+ findLeadLag<-function(dt=0.01, j=2, symbList)
  {
      
      symb1=symbList[1]
@@ -54,7 +55,7 @@ options(digits.secs=3)
      
      
      symb1DT[,pricemid:=(askprice0*askvolume0+bidprice0*bidvolume0)/(askvolume0+bidvolume0)]
-     symb1DT[,logRet:=rowSums(obDT[,lapply(1:kMax,FUN=function(x) obDT[,log(shift(pricemid,x, type="lead"))-log(pricemid)])]*exp(-0.5*(kMax:1)))]
+     symb1DT[,logRet:=rowSums(symb1DT[,lapply(1:j,FUN=function(x) symb1DT[,log(shift(pricemid,x, type="lead"))-log(pricemid)])]*exp(-0.5*(j:1)))]
      #symb1DT<-symb1DT[logRet!=0]
      #symb1DT<-symb1DT[,.SD[1],by=datetime]
      symb1.zoo<-xts(x=symb1DT[,.(logRet)], order.by=symb1DT[,datetime])
@@ -71,6 +72,9 @@ options(digits.secs=3)
      
      symb2DT[,pricemid:=(askprice0*askvolume0+bidprice0*bidvolume0)/(askvolume0+bidvolume0)]
      symb2DT[,logRet:=rowSums(symb2DT[,lapply(1:j,FUN=function(x) symb2DT[,log(shift(pricemid,x, type="lead"))-log(pricemid)])]*exp(-0.5*(j:1)))]
+     
+     
+     
      #symb2DT<-symb2DT[logRet!=0]
      #symb2DT<-symb2DT[,.SD[1],by=datetime]
      symb2.zoo<-xts(x=symb2DT[,.(logRet)], order.by=symb2DT[,datetime])
@@ -96,6 +100,9 @@ options(digits.secs=3)
      
      G <- seq(-10*j*dt, 10*j*dt, by = dt)
      est <- llag(list( symbDT[1:100000]$symb1, symbDT[1:100000]$symb2), grid = G, ci = TRUE)
+
+     #est <- llag(list( symb1.zoo[1:10000]$logRet, symb2.zoo[1:10000]$logRet), grid = G, ci = TRUE)
+     
      ## The shape of the plotted cross-correlation is evidently bimodal,
      ## so there are likely two lead-lag parameters
      
@@ -107,9 +114,10 @@ options(digits.secs=3)
  
  
  symbList<-c("RTS", "SBRF", "BR", "SI", "GAZ")
+ symbList<-c("BRAP",  "BR")
  resLL<-lapply(combn(symbList,2, simplify = F),FUN=function(s)findLeadLag(symbList = s))
  
- lapply(1:10,FUN=function(i){
+ lapply(1:length(resLL),FUN=function(i){
      symbPair<-toString(combn(symbList,2, simplify = F)[[i]])
      png(filename=paste(symbPair,".png",sep=""),width = 1024, height = 768)
      plot(resLL[[i]])
