@@ -31,7 +31,7 @@ getSymbData<-function(symbol, fname){
 }
 
 
-getSymbol.MOEX<-function(from=as.Date("2016-03-28"), to=as.Date("2016-04-05"),symbList=c("GZM5", "GZH5"), homeDir="~/repos/Data/MOEX/"){
+getSymbol.MOEX<-function(from=as.Date("2016-03-24"), to=as.Date("2016-03-24"),symbList=c("GZM5", "GZH5"), homeDir="~/repo/Data/MOEX/"){
     
     years<-year(from):year(to)    
     fileFilter<-paste("FT",format(seq.Date(from=from, to=to, by=1),"%y%m%d"),".zip",sep="")

@@ -44,7 +44,7 @@ getMOEXDATA<-function(date){
   }
 }
 
-startDate<-as.Date("2016-07-28")
+startDate<-as.Date("2016-09-01")
 endDate<-Sys.Date()
 
 lapply(seq.Date(from=startDate,to=endDate, by=1),getMOEXDATA)
