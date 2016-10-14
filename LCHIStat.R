@@ -2,6 +2,8 @@ library(blotter)
 library(rusquant)
 library(data.table)
 data("tickers")
+options(scipen=10)
+options(digits = 1)
 if (!exists('.blotter')) .blotter <- new.env()
 userPortf<-"user_port"
 userAcc<-"user_acc"
@@ -45,10 +47,8 @@ hcchart.Posn<-function (Symbol, Dates = NULL,...)
     Portfolio$symbols[[Symbol]]$txn <- Portfolio$symbols[[Symbol]]$txn[Dates]
     Portfolio$symbols[[Symbol]]$posPL <- Portfolio$symbols[[Symbol]]$posPL[Dates]
     Trades = Portfolio$symbols[[Symbol]]$txn$Txn.Qty
-    Buys = Portfolio$symbols[[Symbol]]$txn$Txn.Price[which(Trades > 
-                                                               0)]
-    Sells = Portfolio$symbols[[Symbol]]$txn$Txn.Price[which(Trades < 
-                                                                0)]
+    Buys = Portfolio$symbols[[Symbol]]$txn$Txn.Price[which(Trades > 0)]
+    Sells = Portfolio$symbols[[Symbol]]$txn$Txn.Price[which(Trades < 0)]
     Position = Portfolio$symbols[[Symbol]]$txn$Pos.Qty
     if (nrow(Position) < 1) 
         stop("no transactions/positions to chart")
@@ -71,51 +71,71 @@ hcchart.Posn<-function (Symbol, Dates = NULL,...)
     # hightChat implementation
     
     library("highcharter")
-    highchart() %>%
-        hc_title(text = Symbol)%>%
+    hc<-highchart() %>%
+        hc_plotOptions(series=list(dataGrouping=list(enabled=FALSE))) %>%
+        hc_title(text = paste(Symbol, "Buys:", nrow(Buys), " / Sells:",nrow(Sells)))%>%
         hc_yAxis_multiples(
             list(title = list(text = NULL), height = "60%", top = "0%"),
-            list(title = list(text = NULL), height = "10%",top = "60%"),
-            list(title = list(text = NULL), height = "15%",top = "75%"),
-            list(title = list(text = NULL), height = "15%",top = "85%")
+            list(title = list(text = NULL), height = "10%",top = "67%"),
+            list(title = list(text = NULL), height = "20%",top = "80%")
         ) %>% 
-        
-        hc_add_series_ohlc(Prices, yAxis = 0, name=Symbol) %>% 
-        hc_add_series_xts(Buys,
+        hc_add_series_ohlc(Prices, yAxis = 0, name=Symbol)
+    
+    if (nrow(Buys)!=0)
+    hc<-hc %>% hc_add_series_xts(Buys,
                           color = "green",
                           type="scatter",
-                          marker = list(symbol = fa_icon_mark("arrow-up")),
+                          #marker = list(symbol = fa_icon_mark("arrow-up")),
+                          marker = list(symbol = "triangle"),
                           yAxis = 0, 
-                          name="Buy")%>%
-        hc_add_series_xts(Sells,  
+                          name="Buy")
+    
+    if(nrow(Sells)!=0)
+    hc<-hc %>%  hc_add_series_xts(Sells,  
                           color = "red",
                           type="scatter",
-                          marker = list(symbol = fa_icon_mark("arrow-down")), 
+                          #marker = list(symbol = fa_icon_mark("arrow-down")), 
+                          marker = list(symbol = "triangle-down"),
                           yAxis = 0, 
-                          name="Sell")%>%
-        hc_add_series_xts(Positionfill[paste(min(index(Prices)),"::",sep="")], 
-                          type="scatter",
+                          name="Sell")
+    
+    if(nrow(Positionfill[paste(min(index(Prices)),"::",sep="")])!=0)
+        hc<-hc %>% hc_add_series_xts(Positionfill[paste(min(index(Prices)),"::",sep="")], 
+                          #type="scatter",
+                          type = "line", 
+                          #type="column",
                           color = "blue",
-                          yAxis=1, 
-                          name="Poitionfill")%>%
-        hc_add_series_xts(Position[paste(min(index(Prices)),"::",sep="")], 
-                          type = "scatter", 
-                          color = "orange",
-                          yAxis=1, 
-                          name="Position")%>%
-        hc_add_series_xts(CumPL[paste(min(index(Prices)),"::",sep="")], 
+                          yAxis=1,
+                          #marker = list(symbol = "square"),
+                          name="Poitionfill")
+    # if(nrow(Position[paste(min(index(Prices)),"::",sep="")])!=0)
+    #     hc<-hc %>% hc_add_series_xts(Position[paste(min(index(Prices)),"::",sep="")], 
+    #                       #type = "scatter", 
+    #                       color = "orange",
+    #                       type = "line", 
+    #                       yAxis=1, 
+    #                       #marker = list(symbol = "square"),
+    #                       name="Position")
+    if(nrow(CumPL[paste(min(index(Prices)),"::",sep="")])!=0)
+        hc<-hc %>%hc_add_series_xts(CumPL[paste(min(index(Prices)),"::",sep="")], 
                           color = "darkgreen", 
                           type = "line", 
                           yAxis=2,
-                          name="CumPL")%>%
-        hc_add_series_xts(Drawdown[paste(min(index(Prices)),"::",sep="")], 
+                          name="CumPL")
+    if(nrow(Drawdown[paste(min(index(Prices)),"::",sep="")])!=0)
+        hc<-hc %>% hc_add_series_xts(Drawdown[paste(min(index(Prices)),"::",sep="")], 
                           color = "darkred", 
                           type = "line", 
-                          yAxis=3, 
+                          yAxis=2, 
                           name="Drawdown")
+    hc %>% 
+        #hc_add_theme(hc_theme_flat())
+        #hc_add_theme(hc_theme_smpl())
+        #Cool hc_add_theme(hc_theme_538())
+        hc_add_theme(hc_theme_gridlight())
 } 
 
-makePortfolio<-function(yearId, userId,marketId){
+makePortfolio<-function(yearId, userId,marketId, nickname="unknown", amount=100000){
 
   #Remove account and portfolio if run previously
   #.blotter<-NULL
@@ -191,7 +211,7 @@ makePortfolio<-function(yearId, userId,marketId){
   
   # Initialize the Portfolio
   initDate<-"2010-01-14"
-  initEq<-100000
+  initEq<-amount
   #initPortf(userPortf,symbols=symbol,initDate=initDate)
   initPortf(userPortf,symbols=symbols,initDate=initDate)
   
@@ -225,23 +245,129 @@ makePortfolio<-function(yearId, userId,marketId){
  
   #lapply(symbols, FUN=function(s) chart.Posn(userPortf, s, theme=theme))
   tStats <- tradeStats(Portfolios = userPortf, use="trades", inclZeroDays=FALSE)
-  tStats[,4:ncol(tStats)] <- round(tStats[,4:ncol(tStats)], 2)
-  print(data.frame(t(tStats[,-c(1,2)])))
+  #tStats[,4:ncol(tStats)] <- round(tStats[,4:ncol(tStats)], 2)
+  print(data.frame(t(tStats[,-c(1,2, 23)])))
+  data.table(nickname=nickname, userId=userId, marketdId=marketdId, symbol=rownames(tStats),tStats[,-c(1,2)])
   
 }
 
 # 2016
-# 83841 - robot_v5
-# 83836 - robot_kingfees
-makePortfolio(2016, 83836,2)
+# 83841 / 2 - robot_v5
+# 83836 / 2 - robot_kingfees
+# 83013 / 1 - Shadrin
+#userData<-data.table(userData)
+#userData[,Amount:=V3*V4]
+#userData[,.(sum(V3), .N), by=V2]
 
+
+# Make stat table
+dayResDT<-read.csv("ftp://ftp.moex.com/pub/info/stats_contest/2016/result_day.csv", stringsAsFactors = F, sep=";", 
+                   header=T, fileEncoding = "CP1251")
+dayResDT<-data.table(dayResDT)
+dayResDT[, marketId:=ifelse(contype_name=="Срочный", 2, ifelse(contype_name=="Фондовый", 1,3))]
+dayResDT[count_deal>0 & marketId==2][order(-dohod)]
+
+statDT<-dayResDT[count_deal>0 & marketId==2][order(-dohod)][1:100]
+
+
+timerStart<-Sys.time()
+resDT<-rbindlist(lapply(1:statDT[,.N], FUN = function(x) makePortfolio(2016, statDT[x,trader_id], statDT[x,marketId], statDT[x,nik], statDT[x,amount] )))
+print(Sys.time()-timerStart)
+
+cols<-c("nickname",
+        "symbol",
+        "Num.Txns",
+        "Num.Trades",
+        "Net.Trading.PL",     
+        #"Avg.Trade.PL",
+        #"Med.Trade.PL",
+        #"Largest.Winner",    
+        #"Largest.Loser",
+        #"Gross.Profits",
+        #"Gross.Losses",
+        #"Std.Dev.Trade.PL",
+        "Percent.Positive",
+        "Percent.Negative",
+        "Profit.Factor",
+        #"Avg.Win.Trade",
+        #"Med.Win.Trade",
+        #"Avg.Losing.Trade"  ,
+        #"Med.Losing.Trade",
+        "Max.Drawdown",
+        #"Profit.To.Max.Draw" ,
+        "Max.Equity"        ,
+        "Min.Equity",
+        "End.Equity")
+
+r<-resDT[,.SD, .SDcols=cols] [order(-Profit.Factor)] 
+
+
+
+x=1
+
+
+makePortfolio(2016, statDT[x,trader_id], statDT[x,marketId], statDT[x,nik], statDT[x,amount] )
+hcchart.Posn(symbols[7])
+
+
+library(jsonlite)
+library(httr)
+getInitPos<-function(traderId=83225, startDate="2016-09-16"){
+    resp<-POST(url = "investor.moex.com/ru/statistics/2016/portfolio.aspx/GetPortfolioData", 
+               encode = "json", 
+               body = list('traderId'=paste0(traderId),'date'=paste0(startDate),'tableId'=6 ))
+    stop_for_status(resp)
+    #str(resp$headers)
+    json<-content(resp, "text")
+    validate(json)
+    
+    initPos <- fromJSON(fromJSON(txt = json)$d)
+    initPos$start_pos<-getStartPos(initPos$pos)
+    initPos
+}
+
+getStartPos<-function(ipos){
+    sapply(ipos, FUN=function(x){
+        res<-as.numeric(strsplit(gsub(")","",gsub(" ","",x)),split="(", fixed=T)[[1]])
+        res[is.na(res)]<-0
+        res[1]-res[2]
+    })
+}
+
+getQuotesCount<-function(traderId=83225, onDate="2016-09-16", marketId=0){
+    resp<-POST(url = "investor.moex.com/ru/statistics/2016/portfolio.aspx/GetPortfolioData", 
+               encode = "json", 
+               body = list('traderId'=paste0(traderId),'date'=paste0(onDate),'tableId'=2 ))
+    stop_for_status(resp)
+    #str(resp$headers)
+    json<-content(resp, "text")
+    validate(json)
+    
+    content.df <- fromJSON(fromJSON(txt = json)$d)
+    if(!is.null(dim(content.df)))
+                content.df[marketId+1,]$quotes
+    else 0.0
+                
+
+}
+
+
+
+res<-getInitPos(statDT[1,trader_id],paste(strptime(statDT[1,date_start], format = "%d.%m.%Y")))
+
+
+
+statDT<-dayResDT[count_deal>0 & marketId==2][order(-count_deal)][1:100]
+statDT[,id:=1:.N]
+
+statDT[,qt:=as.numeric(getQuotesCount(traderId =trader_id, onDate=Sys.Date())), by=id]
+
+x=2
+
+getInitPos(statDT[order(-qt)][x,trader_id], paste(strptime(statDT[order(-qt)][x,date_start], format = "%d.%m.%Y")))
+makePortfolio(2016, statDT[order(-qt)][x,trader_id], statDT[order(-qt)][x,marketId], statDT[order(-qt)][x,nik], statDT[order(-qt)][x,amount] )
 hcchart.Posn(symbols[3])
 
-
-
-userData<-data.table(userData)
-userData[,Amount:=V3*V4]
-userData[,.(sum(V3), .N), by=V2]
 
 # chart.ME(
 #     Portfolio=userPortf,
@@ -252,17 +378,15 @@ userData[,.(sum(V3), .N), by=V2]
 # 
 # chart.ME(
 #     Portfolio=userPortf,
-#     Symbol=symbol,
+#     Symbol=symbol
 #     type='MFE',
 #     scale='percent'
 # )
 # 
 # 
 # #trade statistics
- tStats <- tradeStats(Portfolios = userPortf, use="trades", inclZeroDays=FALSE)
- tStats[,4:ncol(tStats)] <- round(tStats[,4:ncol(tStats)], 2)
- print(data.frame(t(tStats[,-c(1,2)])))
-# 
+
+ # 
 # #daily statistics
 # dStats<-dailyStats(Portfolios = userPortf, use="trades")
 # print(data.frame(t(dStats)))
@@ -271,6 +395,4 @@ userData[,.(sum(V3), .N), by=V2]
 # charts.PerformanceSummary(PortfReturns(userAcc))
 # portRet<-PortfReturns(Account=userAcc, period="daily")
 # print(data.frame(t(portRet)))
- 
-
  
