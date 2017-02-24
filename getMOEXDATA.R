@@ -6,6 +6,7 @@
 
 #install.packages("RCurl")
 library(RCurl)
+library(XML)
 
 bdown=function(url, file){
   if(file.exists(file)){
@@ -25,17 +26,26 @@ bdown=function(url, file){
 
 
 getMOEXDATA<-function(year){
-  homeDir<-"~/repos/Data/MOEX/"
+  homeDir<-"~/repo/Data/MOEX/"
   setwd(homeDir)
   dir.create(paste(year,sep=""))
   setwd(paste(homeDir,year,sep=""))
+  #http://ftp.moex.com/pub/info/stats/history/F/2017/
+  urlMOEX<-paste("http://ftp.moex.com/pub/info/stats/history/F/",year,"/",sep="")
+#  fileNames<-getURL(url = urlMOEX,ftp.use.epsv = FALSE,dirlistonly = TRUE)
+#  fileNames<-strsplit(fileNames,"\r*\n")[[1]]
   
-  urlMOEX<-paste("ftp://ftp.moex.com/pub/info/stats/history/F/",year,"/",sep="")
-  fileNames<-getURL(url = urlMOEX,ftp.use.epsv = FALSE,dirlistonly = TRUE)
-  fileNames<-strsplit(fileNames,"\r\n")[[1]]
+  doc <- htmlParse(urlMOEX)
+  fileNames <- xpathSApply(doc, "//a/@href")
+  free(doc)
   
+  fileNames<-sapply(fileNames,FUN=function(x)as.character(strsplit(x,"/")[[1]][8]))
   lapply(fileNames[grepl("FT",toupper(fileNames))],
          FUN=function(x)bdown(paste(urlMOEX,x,sep=""),x))
 }
 
 lapply(2016:2016,FUN = getMOEXDATA)
+
+
+
+

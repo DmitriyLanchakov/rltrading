@@ -12,10 +12,10 @@ symbols<-c("@Si",
            "@BR"
            )
 
-from<-"2016-05-16"
+from<-"2016-01-16"
 #to<-"2016-08-31"
 to<-Sys.Date()
-period<-"1min"
+period<-"10min"
 for(s in symbols)
     getSymbols(s, from=from, to=to, period=period, src='mfd',adjust=TRUE, auto.assign=TRUE)
 
@@ -23,7 +23,7 @@ symbols<-toupper(symbols)
 
 df<-merge.xts(Cl(get(symbols[1])),Cl(get(symbols[2])),Vo(get(symbols[2])))
 colnames(df)<-c("USDRUB", "OIL", "VOLUSDRUB")
-yearmonth<-as.numeric(format(index(df), "%d%H"))#"%y%m"))
+yearmonth<-as.numeric(format(index(df), "%y%m"))
 df$USDRUB<-df$USDRUB/1000
 qplot(OIL, USDRUB, 
       alpha=0.5,color=factor(yearmonth),data=df,
